@@ -42,7 +42,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: /home/runner/work/PaaS_ClientSide/PaaS_ClientSide/bin/cmd
+          file: /home/runner/work/PaaS_ClientSide/PaaS_ClientSide/cmd
           asset_name: cmd
           tag: ${{ github.ref }}
           overwrite: true
