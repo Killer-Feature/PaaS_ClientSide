@@ -24,5 +24,6 @@ func (h *Handler) Register(s *echo.Echo) {
 }
 
 func (h *Handler) GetHello(c echo.Context) error {
+	h.logger.Info("request received", zap.String("host", c.Request().RemoteAddr))
 	return c.HTML(http.StatusOK, "hello")
 }
