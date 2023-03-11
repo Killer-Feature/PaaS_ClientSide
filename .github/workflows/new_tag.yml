@@ -49,7 +49,7 @@ jobs:
   create-tag:
     name: Publish binaries
     runs-on: ubuntu-latest
-    needs: [build-22.04, build-20.04]
+    needs: [build-22-04, build-20-04]
 
     steps:
       - uses: actions/download-artifact@v3
