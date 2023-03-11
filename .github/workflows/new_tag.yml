@@ -19,13 +19,13 @@ jobs:
 
       - name: Build
         run: mkdir -p bin;
-          go build -o ./bin -v ./...
+          go build -o bin/PaaS -v ./cmd/main.go
 
       - name: Archive builded binary
         uses: actions/upload-artifact@v3
         with:
           name: release-binary
-          path: bin/cmd
+          path: bin/PaaS
   create-tag:
     name: Publish binaries
     runs-on: ubuntu-latest
@@ -35,15 +35,12 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: release-binary
-      - name: LS
-        run: ls /home/runner/work/PaaS_ClientSide/PaaS_ClientSide
-
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: /home/runner/work/PaaS_ClientSide/PaaS_ClientSide/cmd
-          asset_name: cmd
+          file: PaaS
+          asset_name: PaaS
           tag: ${{ github.ref }}
           overwrite: true
-          body: "This is my release"
+          body: "This is new release"
