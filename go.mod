@@ -3,6 +3,7 @@ module KillerFeature/ClientSide
 go 1.20
 
 require (
+	github.com/elazarl/go-bindata-assetfs v1.0.1
 	github.com/labstack/echo/v4 v4.10.2
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
