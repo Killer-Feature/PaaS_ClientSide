@@ -18,7 +18,7 @@ jobs:
 
       - name: Build
         run: mkdir -p bin;
-          go mod download;
+          go mod tidy;
           go build -o ./bin -v ./...
 
       - name: Archive builded binary
