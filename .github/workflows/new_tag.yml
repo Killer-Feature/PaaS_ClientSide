@@ -34,6 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Generate the artifacts
+        uses: skx/github-action-build@master
+
       - name: Upload the artifacts
         uses: skx/github-action-publish-binaries@master
         env:
