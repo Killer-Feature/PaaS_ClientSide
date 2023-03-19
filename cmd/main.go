@@ -11,8 +11,9 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	"KillerFeature/ClientSide/internal/handlers"
-	"KillerFeature/ClientSide/internal/service"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/handlers"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/repository"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/service"
 )
 
 func main() {
@@ -35,7 +36,11 @@ func main() {
 	ctx := context.Background()
 	g, _ := errgroup.WithContext(ctx)
 
-	u := service.NewService()
+	r, err := repository.Create(logger)
+	if err != nil {
+		logger.Fatal("database creating error", zap.Error(err))
+	}
+	u := service.NewService(r, logger)
 	h := handlers.NewHandler(logger, u)
 	h.Register(server)
 

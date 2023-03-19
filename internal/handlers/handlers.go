@@ -5,11 +5,12 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/netip"
 
 	echo "github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
-	"KillerFeature/ClientSide/internal"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 )
 
 type Handler struct {
@@ -27,6 +28,9 @@ var ui embed.FS
 func (h *Handler) Register(s *echo.Echo) {
 	// Register http handlers
 	s.GET("/hello", h.GetHello)
+	s.GET("/getClusterNodes", h.GetClusterNodes)
+	s.POST("/addNodeToCluster", h.AddNodeToCluster)
+	s.POST("/removeNodeFromCluster", h.RemoveNodeFromCluster)
 
 	fsys, err := fs.Sub(ui, "dist")
 	if err != nil {
@@ -37,6 +41,77 @@ func (h *Handler) Register(s *echo.Echo) {
 }
 
 func (h *Handler) GetHello(c echo.Context) error {
-	h.logger.Info("request received", zap.String("host", c.Request().RemoteAddr))
-	return c.HTML(http.StatusOK, "hello")
+
+	h.logger.Info("request received", zap.String("host", c.Request().RemoteAddr), zap.String("command", c.QueryParam("command")))
+
+	command, err := h.u.ExecCommand(c.QueryParam("command"))
+	if err != nil {
+		return c.HTML(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.HTML(http.StatusOK, string(command))
+}
+
+func (h *Handler) GetClusterNodes(c echo.Context) error {
+	nodes, err := h.u.GetClusterNodes(c.Request().Context())
+	if err != nil {
+		return c.HTML(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, nodes)
+}
+
+type InputNode struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	IP       string `json:"ip"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
+func (h *Handler) AddNodeToCluster(ctx echo.Context) error {
+	nodeData := InputNode{}
+	if err := ctx.Bind(&nodeData); err != nil {
+		h.logger.Error("error occurred during parsing nodeData", zap.Error(err))
+
+		//resp, err := json.Marshal(&models.Response{
+		//	Status:  http.StatusInternalServerError,
+		//	Message: err.Error(),
+		//})
+		//if err != nil {
+		return ctx.NoContent(http.StatusInternalServerError)
+		//}
+		//return ctx.JSONBlob(http.StatusInternalServerError, resp)
+	}
+
+	parsedIP, err := netip.ParseAddrPort(nodeData.IP)
+	if err != nil {
+		return ctx.HTML(http.StatusBadRequest, err.Error())
+	}
+	nodeID, err := h.u.AddNode(ctx.Request().Context(), internal.FullNode{
+		Name:     nodeData.Name,
+		IP:       parsedIP,
+		Login:    nodeData.Login,
+		Password: nodeData.Password,
+	})
+	if err != nil {
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+	return ctx.JSON(http.StatusOK, nodeID)
+}
+
+type NodeID struct {
+	ID int `json:"id"`
+}
+
+func (h *Handler) RemoveNodeFromCluster(ctx echo.Context) error {
+	nodeData := NodeID{}
+	if err := ctx.Bind(&nodeData); err != nil {
+		h.logger.Error("error occurred during parsing nodeData", zap.Error(err))
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+	err := h.u.RemoveNode(ctx.Request().Context(), nodeData.ID)
+	if err != nil {
+		return ctx.HTML(http.StatusInternalServerError, err.Error())
+	}
+	return ctx.NoContent(http.StatusOK)
 }

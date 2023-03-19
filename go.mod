@@ -1,15 +1,16 @@
-module KillerFeature/ClientSide
+module github.com/Killer-Feature/PaaS_ClientSide
 
 go 1.20
 
 require (
-	github.com/elazarl/go-bindata-assetfs v1.0.1
 	github.com/labstack/echo/v4 v4.10.2
+	github.com/mattn/go-sqlite3 v1.14.16
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
 )
 
 require (
+	github.com/Killer-Feature/PaaS_ServerSide v0.0.0-20230318151747-fb12b8ed1ecc
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
