@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
 
@@ -16,12 +17,16 @@ type Service struct {
 	r  internal.Repository
 	l  *zap.Logger
 	tm *taskmanager.Manager
+
+	k8sInstaller *k8s_installer.Installer
 }
 
-func NewService(r internal.Repository, l *zap.Logger) internal.Usecase {
+func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager, k8sInstaller *k8s_installer.Installer) internal.Usecase {
 	return &Service{
-		r: r,
-		l: l,
+		r:            r,
+		l:            l,
+		tm:           tm,
+		k8sInstaller: k8sInstaller,
 	}
 }
 
@@ -48,14 +53,19 @@ func (s *Service) GetClusterNodes(ctx context.Context) ([]internal.Node, error) 
 	return respNodes, nil
 }
 
-func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) {
+func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, error) {
 	// TODO: Add task
 
-	// task, err := s.tm.AddTask()
-	//if err != nil {
-	//	return
-	//}
+	node, err := s.r.GetFullNode(ctx, id)
+	if err != nil {
+		return 0, err
+	}
 
+	taskID, err := s.tm.AddTask(s.k8sInstaller.InstallK8S, node.IP, taskmanager.AuthData{
+		Login:    node.Login,
+		Password: node.Password,
+	})
+	return int(taskID), err
 }
 
 func (s *Service) AddNode(ctx context.Context, node internal.FullNode) (int, error) {

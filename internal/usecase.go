@@ -11,6 +11,7 @@ type Usecase interface {
 	GetClusterNodes(ctx context.Context) ([]Node, error)
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
+	AddNodeToCurrentCluster(ctx context.Context, id int) (int, error)
 }
 
 var (

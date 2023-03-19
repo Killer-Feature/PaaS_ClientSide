@@ -7,6 +7,7 @@ import (
 
 type Repository interface {
 	GetNodes(ctx context.Context) ([]FullNode, error)
+	GetFullNode(ctx context.Context, id int) (FullNode, error)
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
 	IsNodeExists(ctx context.Context, ip netip.AddrPort) (bool, error)

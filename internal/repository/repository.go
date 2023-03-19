@@ -13,7 +13,7 @@ import (
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 )
 
-func Create(l *zap.Logger) (*Repository, error) {
+func Create(l *zap.Logger) (internal.Repository, error) {
 	if _, err := os.Stat("./internal_data.db"); errors.Is(err, os.ErrNotExist) {
 		l.Debug("Creating new sql database")
 		file, err := os.Create("internal_data.db") // Create SQLite file
@@ -63,6 +63,7 @@ func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) 
 		return nil, err
 	}
 	defer rows.Close()
+
 	var selectedNodes []internal.FullNode
 	for rows.Next() {
 		var singleNode internal.FullNode
@@ -79,6 +80,24 @@ func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) 
 	}
 
 	return selectedNodes, nil
+}
+
+func (r *Repository) GetFullNode(ctx context.Context, id int) (internal.FullNode, error) {
+	sqlScript := "SELECT id, name, ip, login, password FROM nodes WHERE id = $1"
+
+	var singleNode internal.FullNode
+	var ip string
+	err := r.db.QueryRowContext(ctx, sqlScript, id).Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password)
+	if err != nil {
+		r.l.Error("error in db query during getting nodes", zap.Error(err))
+		return internal.FullNode{}, err
+	}
+	singleNode.IP, err = netip.ParseAddrPort(ip)
+	if err != nil {
+		r.l.Error("error during parsing ip from database", zap.Error(err))
+		return internal.FullNode{}, err
+	}
+	return singleNode, nil
 }
 
 type Repository struct {

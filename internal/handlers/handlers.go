@@ -29,6 +29,7 @@ func (h *Handler) Register(s *echo.Echo) {
 	// Register http handlers
 	s.GET("/hello", h.GetHello)
 	s.GET("/getClusterNodes", h.GetClusterNodes)
+	s.POST("/addNode", h.AddNode)
 	s.POST("/addNodeToCluster", h.AddNodeToCluster)
 	s.POST("/removeNodeFromCluster", h.RemoveNodeFromCluster)
 
@@ -69,18 +70,24 @@ type InputNode struct {
 }
 
 func (h *Handler) AddNodeToCluster(ctx echo.Context) error {
+	nodeData := NodeID{}
+	if err := ctx.Bind(&nodeData); err != nil {
+		h.logger.Error("error occurred during parsing nodeData", zap.Error(err))
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+
+	nodeID, err := h.u.AddNodeToCurrentCluster(ctx.Request().Context(), nodeData.ID)
+	if err != nil {
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+	return ctx.JSON(http.StatusOK, nodeID)
+}
+
+func (h *Handler) AddNode(ctx echo.Context) error {
 	nodeData := InputNode{}
 	if err := ctx.Bind(&nodeData); err != nil {
 		h.logger.Error("error occurred during parsing nodeData", zap.Error(err))
-
-		//resp, err := json.Marshal(&models.Response{
-		//	Status:  http.StatusInternalServerError,
-		//	Message: err.Error(),
-		//})
-		//if err != nil {
 		return ctx.NoContent(http.StatusInternalServerError)
-		//}
-		//return ctx.JSONBlob(http.StatusInternalServerError, resp)
 	}
 
 	parsedIP, err := netip.ParseAddrPort(nodeData.IP)

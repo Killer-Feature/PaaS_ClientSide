@@ -6,6 +6,10 @@ import (
 	"log"
 	"net/http"
 
+	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
+	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/logger/zaplogger"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -19,17 +23,18 @@ import (
 func main() {
 	config := zap.NewDevelopmentConfig()
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	prLogger, err := config.Build()
+	prLogger, err := zaplogger.NewZapLogger(&config)
+	servLogger := servlog.NewServLogger(prLogger)
 	if err != nil {
 		log.Fatal("zap logger build error")
 	}
-	logger := prLogger
+	logger := prLogger.Desugar()
 	defer func(prLogger *zap.Logger) {
 		err = prLogger.Sync()
 		if err != nil {
 			log.Fatal(err)
 		}
-	}(prLogger)
+	}(logger)
 
 	server := echo.New()
 
@@ -40,7 +45,9 @@ func main() {
 	if err != nil {
 		logger.Fatal("database creating error", zap.Error(err))
 	}
-	u := service.NewService(r, logger)
+	tm := taskmanager.NewTaskManager(ctx, servLogger)
+	k8sinstaller := k8s_installer.NewInstaller(logger, r)
+	u := service.NewService(r, logger, tm, k8sinstaller)
 	h := handlers.NewHandler(logger, u)
 	h.Register(server)
 
