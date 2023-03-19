@@ -12,9 +12,11 @@ const (
 
 type Command string
 
+type Parser func(output []byte, extraData interface{}) error
+
 type CommandAndParser struct {
 	Command   Command
-	Parser    func(output []byte, extraData interface{}) error
+	Parser    Parser
 	Condition Condition
 }
 
