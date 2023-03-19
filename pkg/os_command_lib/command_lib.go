@@ -21,9 +21,9 @@ type CommandAndParser struct {
 type Condition uint8
 
 const (
-	sufficient Condition = iota
-	required
-	anyway
+	Sufficient Condition = iota
+	Required
+	Anyway
 )
 
 func (c CommandAndParser) WithArgs(args ...string) CommandAndParser {
