@@ -51,10 +51,10 @@ func (s *Service) GetClusterNodes(ctx context.Context) ([]internal.Node, error) 
 func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) {
 	// TODO: Add task
 
-	task, err := s.tm.AddTask()
-	if err != nil {
-		return
-	}
+	// task, err := s.tm.AddTask()
+	//if err != nil {
+	//	return
+	//}
 
 }
 
