@@ -28,10 +28,10 @@ var ui embed.FS
 func (h *Handler) Register(s *echo.Echo) {
 	// Register http handlers
 	s.GET("/hello", h.GetHello)
-	s.GET("/getClusterNodes", h.GetClusterNodes)
-	s.POST("/addNode", h.AddNode)
-	s.POST("/addNodeToCluster", h.AddNodeToCluster)
-	s.POST("/removeNodeFromCluster", h.RemoveNodeFromCluster)
+	s.GET("/api/getClusterNodes", h.GetClusterNodes)
+	s.POST("/api/addNode", h.AddNode)
+	s.POST("/api/addNodeToCluster", h.AddNodeToCluster)
+	s.POST("/api/removeNodeFromCluster", h.RemoveNodeFromCluster)
 
 	fsys, err := fs.Sub(ui, "dist")
 	if err != nil {

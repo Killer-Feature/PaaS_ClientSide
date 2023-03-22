@@ -36,7 +36,7 @@ func (u *Ubuntu2004CommandLib) AddCRIORepos() cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) ImportGPGKey() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:1.26/xUbuntu_20.04/Release.key | sudo apt-key add -\ncurl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/Release.key | sudo apt-key add -",
+		Command:   "curl -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:1.26/xUbuntu_20.04/Release.key | sudo apt-key add -; curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/Release.key | sudo apt-key add -",
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -135,14 +135,14 @@ func (u *Ubuntu2004CommandLib) Exit() cl.CommandAndParser {
 func (u *Ubuntu2004CommandLib) InitKubeadm(parser cl.Parser) cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "sudo kubeadm init --pod-network-cidr=10.244.0.0/16",
-		Parser:    nil,
+		Parser:    parser,
 		Condition: cl.Required,
 	}
 }
 
 func (u *Ubuntu2004CommandLib) AddKubeConfig() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "mkdir -p $HOME/.kube\nsudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config\nsudo chown $(id -u):$(id -g) $HOME/.kube/config",
+		Command:   "rm -r  $HOME/.kube \n mkdir -p $HOME/.kube\nsudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config\nsudo chown $(id -u):$(id -g) $HOME/.kube/config",
 		Parser:    nil,
 		Condition: cl.Anyway,
 	}

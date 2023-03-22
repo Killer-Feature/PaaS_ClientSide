@@ -27,7 +27,11 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		l.Debug("internal_data.db created")
 	}
 
-	db, _ := sql.Open("sqlite3", "./internal_data.db")
+	db, err := sql.Open("sqlite3", "./internal_data.db")
+	if err != nil {
+		l.Error("error occurred during db opening", zap.Error(err))
+		return nil, err
+	}
 
 	createNodesTableSQL := `CREATE TABLE IF NOT EXISTS nodes (
 		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -46,16 +50,36 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		l.Error("error occurred during execution table creating statement", zap.Error(err))
 		return nil, err
 	}
+
+	createClustersTableSQL := `CREATE TABLE IF NOT EXISTS clusters (
+		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+		"name" TEXT UNIQUE,
+		"master_ip" TEXT,
+		"token" TEXT,	
+		"hash" TEXT
+	  );`
+
+	statement, err = db.Prepare(createClustersTableSQL)
+	if err != nil {
+		l.Error("error occurred during preparing cluster table creating statement", zap.Error(err))
+	}
+	_, err = statement.Exec()
+	if err != nil {
+		l.Error("error occurred during execution cluster table creating statement", zap.Error(err))
+		return nil, err
+	}
 	l.Debug("repository created")
 
-	return &Repository{
+	r := &Repository{
 		db: db,
 		l:  l,
-	}, err
+	}
+	_, _ = r.AddCluster(context.Background(), "defaultCluster")
+	return r, nil
 }
 
 func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) {
-	sqlScript := "SELECT id, name, ip, login, password FROM nodes"
+	sqlScript := "SELECT id, name, ip, login, password FROM nodes;"
 
 	rows, err := r.db.QueryContext(ctx, sqlScript)
 	if err != nil {
@@ -143,4 +167,112 @@ func (r *Repository) Close() error {
 		}
 	}
 	return nil
+}
+
+func (r *Repository) AddCluster(ctx context.Context, clusterName string) (int, error) {
+	sqlScript := "INSERT INTO clusters(name) VALUES ($1) RETURNING id;"
+	var id int
+	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
+	if err != nil {
+		r.l.Error("error during adding cluster to database", zap.Error(err))
+		return 0, err
+	}
+	return id, nil
+}
+
+func (r *Repository) GetClusterID(ctx context.Context, clusterName string) (int, error) {
+	sqlScript := "SELECT id FROM nodes WHERE name = $1;"
+	var id int
+	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
+	if err != nil {
+		r.l.Error("error during adding cluster to database", zap.Error(err))
+		return 0, err
+	}
+	return id, nil
+}
+
+func (r *Repository) GetClusterName(ctx context.Context, clusterName string) (int, error) {
+	sqlScript := "SELECT id FROM nodes WHERE name = $1;"
+	var id int
+	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
+	if err != nil {
+		r.l.Error("error during adding cluster to database", zap.Error(err))
+		return 0, err
+	}
+	return id, nil
+}
+
+//type Cluster struct {
+//	ID     int
+//	Name   string
+//	Config string
+//	Token  string
+//	Hash   string
+//}
+//
+//func (r *Repository) GetClusters(ctx context.Context) ([]int, []string, error) {
+//	sqlScript := "SELECT id, name FROM clusters;"
+//
+//	rows, err := r.db.QueryContext(ctx, sqlScript)
+//	if err != nil {
+//		r.l.Error("error in db query during getting nodes", zap.Error(err))
+//		return nil, nil, err
+//	}
+//	defer rows.Close()
+//
+//	var ids []int
+//	var names []string
+//
+//	for rows.Next() {
+//		var singleNode internal.FullNode
+//		var ip string
+//		if err = rows.Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password); err != nil {
+//			r.l.Error("error during scanning node from database", zap.Error(err))
+//			return nil, err
+//		}
+//		singleNode.IP, err = netip.ParseAddrPort(ip)
+//		if err != nil {
+//			r.l.Error("error during parsing ip from database", zap.Error(err))
+//		}
+//		selectedNodes = append(selectedNodes, singleNode)
+//	}
+//
+//	return selectedNodes, nil
+//}
+
+func (r *Repository) AddClusterTokenIPAndHash(ctx context.Context, clusterID int, token, masterIP, hash string) error {
+	sqlScript := "UPDATE clusters SET token = $1, hash = $2, master_ip=$3 WHERE id = $4"
+	_, err := r.db.ExecContext(ctx, sqlScript, token, hash, masterIP, clusterID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Repository) CheckClusterTokenIPAndHash(ctx context.Context, clusterID int) (bool, error) {
+	token, masterIP, hash, err := r.GetClusterTokenIPAndHash(ctx, clusterID)
+	if err != nil {
+		return false, err
+	}
+	if token == "" && masterIP == "" && hash == "" {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (r *Repository) GetClusterTokenIPAndHash(ctx context.Context, clusterID int) (token, masterIP, hash string, err error) {
+	var rawToken, rawMasterIP, rawHash sql.NullString
+	sqlScript := "SELECT token, master_ip, hash FROM clusters WHERE id = $1"
+	err = r.db.QueryRowContext(ctx, sqlScript, clusterID).Scan(&rawToken, &rawMasterIP, &rawHash)
+	if rawToken.Valid {
+		token = rawToken.String
+	}
+	if rawMasterIP.Valid {
+		masterIP = rawMasterIP.String
+	}
+	if rawHash.Valid {
+		hash = rawHash.String
+	}
+
+	return
 }

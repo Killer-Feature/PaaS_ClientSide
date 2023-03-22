@@ -19,7 +19,7 @@ var (
 )
 
 type Node struct {
-	ID   int
-	IP   netip.AddrPort
-	Name string
+	ID   int            `json:"id"`
+	IP   netip.AddrPort `json:"ip"`
+	Name string         `json:"name"`
 }

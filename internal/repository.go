@@ -11,6 +11,13 @@ type Repository interface {
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
 	IsNodeExists(ctx context.Context, ip netip.AddrPort) (bool, error)
+
+	AddCluster(ctx context.Context, clusterName string) (int, error)
+	GetClusterID(ctx context.Context, clusterName string) (int, error)
+	GetClusterName(ctx context.Context, clusterName string) (int, error)
+	AddClusterTokenIPAndHash(ctx context.Context, clusterID int, token, masterIP, hash string) error
+	CheckClusterTokenIPAndHash(ctx context.Context, clusterID int) (bool, error)
+	GetClusterTokenIPAndHash(ctx context.Context, clusterID int) (token, masterIP, hash string, err error)
 }
 
 type FullNode struct {
