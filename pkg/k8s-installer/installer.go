@@ -70,7 +70,6 @@ func (installer *Installer) kubeadmJoin(token, ip, hash string) []cl.CommandAndP
 var matchRe = regexp.MustCompile(`(?P<hostport>[a-z0-9-_:.]*) --token (?P<token>[a-z0-9-_.]*) \\\n\t--discovery-token-ca-cert-hash (?P<hash>[a-z0-9-:]*)`)
 
 func (installer *Installer) parseKubeadmInit(output []byte, extraData interface{}) error {
-	installer.l.Info(string(output))
 	outputstr := string(output)
 	outputstrs := strings.Split(outputstr, "kubeadm join ")
 	matchMap := make(map[string]string, len(matchRe.SubexpNames()))
@@ -99,8 +98,10 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn) error {
 		if err != nil {
 			return err
 		}
+		installer.l.Info("Adding new worker to cluster")
 		kubeadmInstallCommands = append(kubeadmInstallCommands, installer.kubeadmJoin(token, ip, hash)...)
 	} else {
+		installer.l.Info("Adding new control plane to cluster")
 		kubeadmInstallCommands = append(kubeadmInstallCommands, installer.kubeadmInit()...)
 	}
 

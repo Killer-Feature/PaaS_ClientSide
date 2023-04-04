@@ -31,6 +31,7 @@ func (h *Handler) Register(s *echo.Echo) {
 	s.GET("/api/getClusterNodes", h.GetClusterNodes)
 	s.POST("/api/addNode", h.AddNode)
 	s.POST("/api/addNodeToCluster", h.AddNodeToCluster)
+	s.POST("/api/removeNode", h.RemoveNode)
 	s.POST("/api/removeNodeFromCluster", h.RemoveNodeFromCluster)
 
 	fsys, err := fs.Sub(ui, "dist")
@@ -110,7 +111,7 @@ type NodeID struct {
 	ID int `json:"id"`
 }
 
-func (h *Handler) RemoveNodeFromCluster(ctx echo.Context) error {
+func (h *Handler) RemoveNode(ctx echo.Context) error {
 	nodeData := NodeID{}
 	if err := ctx.Bind(&nodeData); err != nil {
 		h.logger.Error("error occurred during parsing nodeData", zap.Error(err))
@@ -121,4 +122,8 @@ func (h *Handler) RemoveNodeFromCluster(ctx echo.Context) error {
 		return ctx.HTML(http.StatusInternalServerError, err.Error())
 	}
 	return ctx.NoContent(http.StatusOK)
+}
+
+func (h *Handler) RemoveNodeFromCluster(ctx echo.Context) error {
+	return ctx.HTML(http.StatusInternalServerError, "not implemented")
 }
