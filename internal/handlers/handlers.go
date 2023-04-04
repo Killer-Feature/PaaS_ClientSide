@@ -33,6 +33,7 @@ func (h *Handler) Register(s *echo.Echo) {
 	s.POST("/api/addNodeToCluster", h.AddNodeToCluster)
 	s.POST("/api/removeNode", h.RemoveNode)
 	s.POST("/api/removeNodeFromCluster", h.RemoveNodeFromCluster)
+	s.POST("/api/addResource", h.RemoveNodeFromCluster)
 
 	fsys, err := fs.Sub(ui, "dist")
 	if err != nil {
@@ -126,4 +127,33 @@ func (h *Handler) RemoveNode(ctx echo.Context) error {
 
 func (h *Handler) RemoveNodeFromCluster(ctx echo.Context) error {
 	return ctx.HTML(http.StatusInternalServerError, "not implemented")
+}
+
+type ResourceType struct {
+	Type string `json:"type"`
+}
+
+func (h *Handler) AddResource(ctx echo.Context) error {
+	rType := ResourceType{}
+	if err := ctx.Bind(&rType); err != nil {
+		h.logger.Error("error occurred during parsing ResourceType", zap.Error(err))
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+
+	err := h.u.AddResource(ctx.Request().Context(), ConvertResourceString(rType.Type))
+	if err != nil {
+		return ctx.HTML(http.StatusInternalServerError, err.Error())
+	}
+	return ctx.NoContent(http.StatusOK)
+}
+
+func ConvertResourceString(resource string) internal.ResourceType {
+	switch resource {
+	case "postgres":
+		return internal.Postgres
+	case "redis":
+		return internal.Redis
+	default:
+	}
+	return internal.Undefined
 }

@@ -12,6 +12,7 @@ type Usecase interface {
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
 	AddNodeToCurrentCluster(ctx context.Context, id int) (int, error)
+	AddResource(ctx context.Context, rType ResourceType) error
 }
 
 var (
@@ -23,3 +24,11 @@ type Node struct {
 	IP   netip.AddrPort `json:"ip"`
 	Name string         `json:"name"`
 }
+
+type ResourceType int
+
+const (
+	Undefined ResourceType = iota
+	Postgres
+	Redis
+)

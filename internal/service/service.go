@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm/postgres"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
@@ -81,4 +82,8 @@ func (s *Service) AddNode(ctx context.Context, node internal.FullNode) (int, err
 
 func (s *Service) RemoveNode(ctx context.Context, id int) error {
 	return s.r.RemoveNode(ctx, id)
+}
+
+func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType) error {
+	return postgres.Install()
 }
