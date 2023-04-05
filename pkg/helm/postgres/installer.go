@@ -45,12 +45,12 @@ func Install(releaseName string) error {
 	os.Setenv("HELM_NAMESPACE", namespace)
 	settings = cli.New()
 	// Add helm repo
-	err := RepoAdd(repoName, url)
-	if err != nil {
-		return err
-	}
+	_ = RepoAdd(repoName, url)
+	//if err != nil {
+	//	return err
+	//}
 	// Update charts from the helm repo
-	err = RepoUpdate()
+	err := RepoUpdate()
 	if err != nil {
 		return err
 	}
