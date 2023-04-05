@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm/postgres"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
@@ -84,6 +85,20 @@ func (s *Service) RemoveNode(ctx context.Context, id int) error {
 	return s.r.RemoveNode(ctx, id)
 }
 
-func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType) error {
-	return postgres.Install()
+func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, name string) error {
+	switch rType {
+	case internal.Postgres:
+		return postgres.Install(name)
+	default:
+		return errors.New("resource not implemented")
+	}
+}
+
+func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceType, name string) error {
+	switch rType {
+	case internal.Postgres:
+		return postgres.UnnstallChart(name)
+	default:
+		return errors.New("resource not implemented")
+	}
 }

@@ -12,7 +12,8 @@ type Usecase interface {
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
 	AddNodeToCurrentCluster(ctx context.Context, id int) (int, error)
-	AddResource(ctx context.Context, rType ResourceType) error
+	AddResource(ctx context.Context, rType ResourceType, name string) error
+	RemoveResource(ctx context.Context, rType ResourceType, name string) error
 }
 
 var (

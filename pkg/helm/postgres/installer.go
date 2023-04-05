@@ -30,18 +30,18 @@ import (
 var settings *cli.EnvSettings
 
 var (
-	url         = "https://charts.bitnami.com/bitnami"
-	repoName    = "bitnami"
-	chartName   = "postgresql"
-	releaseName = "postgresql-dev"
-	namespace   = "default"
-	args        = map[string]string{
+	url       = "https://charts.bitnami.com/bitnami"
+	repoName  = "bitnami"
+	chartName = "postgresql"
+	//releaseName = "postgresql-dev"
+	namespace = "default"
+	args      = map[string]string{
 		// comma seperated values to set
 		"set": "primary.persistence.existingClaim=pg-pvc,auth.postgresPassword=pgpass",
 	}
 )
 
-func Install() error {
+func Install(releaseName string) error {
 	os.Setenv("HELM_NAMESPACE", namespace)
 	settings = cli.New()
 	// Add helm repo
@@ -153,7 +153,7 @@ func RepoUpdate() error {
 	return nil
 }
 
-// InstallChart
+// InstallChart installs chart
 func InstallChart(name, repo, chart string, args map[string]string) error {
 	actionConfig := new(action.Configuration)
 	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug); err != nil {
@@ -240,4 +240,17 @@ func isChartInstallable(ch *chart.Chart) (bool, error) {
 func debug(format string, v ...interface{}) {
 	format = fmt.Sprintf("[debug] %s\n", format)
 	log.Output(2, fmt.Sprintf(format, v...))
+}
+
+// UnnstallChart uninstalls chart
+func UnnstallChart(name string) error {
+	actionConfig := new(action.Configuration)
+	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug); err != nil {
+		return err
+	}
+	client := action.NewUninstall(actionConfig)
+
+	resp, err := client.Run(name)
+	fmt.Println(resp)
+	return err
 }
