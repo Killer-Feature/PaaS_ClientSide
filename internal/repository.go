@@ -14,7 +14,7 @@ type Repository interface {
 
 	AddCluster(ctx context.Context, clusterName string) (int, error)
 	GetClusterID(ctx context.Context, clusterName string) (int, error)
-	GetClusterName(ctx context.Context, clusterName string) (int, error)
+	GetClusterName(ctx context.Context, id int) (string, error)
 	AddClusterTokenIPAndHash(ctx context.Context, clusterID int, token, masterIP, hash string) error
 	CheckClusterTokenIPAndHash(ctx context.Context, clusterID int) (bool, error)
 	GetClusterTokenIPAndHash(ctx context.Context, clusterID int) (token, masterIP, hash string, err error)

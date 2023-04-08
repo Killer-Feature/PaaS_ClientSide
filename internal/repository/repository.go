@@ -184,7 +184,7 @@ func (r *Repository) AddCluster(ctx context.Context, clusterName string) (int, e
 }
 
 func (r *Repository) GetClusterID(ctx context.Context, clusterName string) (int, error) {
-	sqlScript := "SELECT id FROM nodes WHERE name = $1;"
+	sqlScript := "SELECT id FROM clusters WHERE name = $1;"
 	var id int
 	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
 	if err != nil {
@@ -194,15 +194,15 @@ func (r *Repository) GetClusterID(ctx context.Context, clusterName string) (int,
 	return id, nil
 }
 
-func (r *Repository) GetClusterName(ctx context.Context, clusterName string) (int, error) {
-	sqlScript := "SELECT id FROM nodes WHERE name = $1;"
-	var id int
-	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
+func (r *Repository) GetClusterName(ctx context.Context, id int) (string, error) {
+	sqlScript := "SELECT name FROM clusters WHERE id = $1;"
+	var name string
+	err := r.db.QueryRowContext(ctx, sqlScript, id).Scan(&name)
 	if err != nil {
 		r.l.Error("error during getting cluster name from database", zap.Error(err))
-		return 0, err
+		return "", err
 	}
-	return id, nil
+	return name, nil
 }
 
 //type Cluster struct {
