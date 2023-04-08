@@ -31,7 +31,7 @@ import (
 var (
 	args = map[string]string{
 		// comma seperated values to set
-		"set": "primary.persistence.size=4Gi,auth.postgresPassword=pgpass",
+		"set": "global.storageClass=local-storage,primary.persistence.size=4Gi,auth.postgresPassword=pgpass",
 	}
 )
 
