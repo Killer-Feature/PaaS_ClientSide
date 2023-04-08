@@ -31,7 +31,7 @@ import (
 var (
 	args = map[string]string{
 		// comma seperated values to set
-		"set": "primary.persistence.existingClaim=pg-pvc,auth.postgresPassword=pgpass",
+		"set": "primary.persistence.size=4Gi,auth.postgresPassword=pgpass",
 	}
 )
 
