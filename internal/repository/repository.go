@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"net/netip"
 	"os"
 	"strconv"
@@ -64,6 +65,22 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 	  );`
 
 	statement, err = db.Prepare(createNodesTableSQL)
+	if err != nil {
+		l.Error("error occurred during preparing table creating statement", zap.Error(err))
+	}
+	_, err = statement.Exec()
+	if err != nil {
+		l.Error("error occurred during execution table creating statement", zap.Error(err))
+		return nil, err
+	}
+
+	createResourcesTableSQL := `CREATE TABLE IF NOT EXISTS resources (
+		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+		"name" TEXT,
+		"type" TEXT
+	  );`
+
+	statement, err = db.Prepare(createResourcesTableSQL)
 	if err != nil {
 		l.Error("error occurred during preparing table creating statement", zap.Error(err))
 	}
@@ -307,4 +324,37 @@ func (r *Repository) GetAdminConf(ctx context.Context, clusterID int) (conf stri
 		conf = rawAdminConf.String
 	}
 	return
+}
+
+func (r *Repository) GetResources(ctx context.Context) ([]models.ResourceData, error) {
+	sqlScript := "SELECT name, type FROM resources;"
+
+	rows, err := r.db.QueryContext(ctx, sqlScript)
+	if err != nil {
+		r.l.Error("error in db query during getting nodes", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var selectedResources []models.ResourceData
+	for rows.Next() {
+		var singleNode models.ResourceData
+		if err = rows.Scan(&singleNode.Name, &singleNode.Type); err != nil {
+			r.l.Error("error during scanning node from database", zap.Error(err))
+			return nil, err
+		}
+		selectedResources = append(selectedResources, singleNode)
+	}
+
+	return selectedResources, nil
+}
+
+func (r *Repository) AddResource(ctx context.Context, rType, name string) error {
+	sqlScript := "INSERT INTO resources(type, name) VALUES ($1, $2);"
+	_, err := r.db.ExecContext(ctx, sqlScript, rType, name)
+	if err != nil {
+		r.l.Error("error during adding cluster to database", zap.Error(err))
+		return err
+	}
+	return nil
 }

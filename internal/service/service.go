@@ -161,3 +161,8 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 	adminConf, err := s.r.GetAdminConf(ctx, clusterId)
 	return &models.AdminConfig{Config: adminConf}, err
 }
+
+func (s *Service) GetResources(ctx context.Context) ([]models.ResourceData, error) {
+
+	return nil, nil
+}
