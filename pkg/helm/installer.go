@@ -11,6 +11,8 @@ import (
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+	"helm.sh/helm/v3/pkg/kube"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/gofrs/flock"
 	"github.com/pkg/errors"
@@ -38,6 +40,8 @@ type HelmInstaller struct {
 	repoUrl   string
 	repoName  string
 
+	config *genericclioptions.ConfigFlags
+
 	l        *zap.Logger
 	settings *cli.EnvSettings
 }
@@ -51,6 +55,8 @@ func NewHelmInstaller(namespace, repoUrl, repoName string, logger *zap.Logger) (
 	}
 	os.Setenv("HELM_NAMESPACE", namespace)
 	hi.settings = cli.New()
+
+	hi.config = kube.GetConfig("./config", "", namespace)
 
 	// Add helm repo
 	err := hi.RepoAdd(hi.repoName, hi.repoUrl)
@@ -173,7 +179,7 @@ func (hi *HelmInstaller) RepoUpdate() error {
 // InstallChart installs chart
 func (hi *HelmInstaller) InstallChart(name, repo, chart string, args map[string]string) error {
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(hi.settings.RESTClientGetter(), hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
+	if err := actionConfig.Init(hi.config, hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
 		return err
 	}
 	client := action.NewInstall(actionConfig)
@@ -262,7 +268,7 @@ func (hi *HelmInstaller) debug(format string, v ...interface{}) {
 // UninstallChart uninstalls chart
 func (hi *HelmInstaller) UninstallChart(name string) error {
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(hi.settings.RESTClientGetter(), hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
+	if err := actionConfig.Init(hi.config, hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
 		return err
 	}
 	client := action.NewUninstall(actionConfig)
