@@ -24,12 +24,13 @@ type Service struct {
 	k8sInstaller *k8s_installer.Installer
 }
 
-func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager, k8sInstaller *k8s_installer.Installer) internal.Usecase {
+func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager, k8sInstaller *k8s_installer.Installer, hi *helm.HelmInstaller) internal.Usecase {
 	return &Service{
 		r:            r,
 		l:            l,
 		tm:           tm,
 		k8sInstaller: k8sInstaller,
+		hi:           hi,
 	}
 }
 

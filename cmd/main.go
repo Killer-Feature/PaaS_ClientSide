@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
 	servlog "github.com/Killer-Feature/PaaS_ServerSide/pkg/logger"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/logger/zaplogger"
@@ -47,7 +48,11 @@ func main() {
 	}
 	tm := taskmanager.NewTaskManager(ctx, servLogger)
 	k8sinstaller := k8s_installer.NewInstaller(logger, r)
-	u := service.NewService(r, logger, tm, k8sinstaller)
+	hi, err := helm.NewHelmInstaller("default", "https://charts.bitnami.com/bitnami", "bitnami", logger)
+	if err != nil {
+		logger.Fatal("helm installer creating error", zap.Error(err))
+	}
+	u := service.NewService(r, logger, tm, k8sinstaller, hi)
 	h := handlers.NewHandler(logger, u)
 	h.Register(server)
 

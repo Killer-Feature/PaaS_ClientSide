@@ -170,6 +170,9 @@ func (r *Repository) Close() error {
 }
 
 func (r *Repository) AddCluster(ctx context.Context, clusterName string) (int, error) {
+	if id, err := r.GetClusterID(ctx, clusterName); err == nil {
+		return id, nil
+	}
 	sqlScript := "INSERT INTO clusters(name) VALUES ($1) RETURNING id;"
 	var id int
 	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
@@ -185,7 +188,7 @@ func (r *Repository) GetClusterID(ctx context.Context, clusterName string) (int,
 	var id int
 	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
 	if err != nil {
-		r.l.Error("error during adding cluster to database", zap.Error(err))
+		r.l.Error("error during getting cluster id from database", zap.Error(err))
 		return 0, err
 	}
 	return id, nil
@@ -196,7 +199,7 @@ func (r *Repository) GetClusterName(ctx context.Context, clusterName string) (in
 	var id int
 	err := r.db.QueryRowContext(ctx, sqlScript, clusterName).Scan(&id)
 	if err != nil {
-		r.l.Error("error during adding cluster to database", zap.Error(err))
+		r.l.Error("error during getting cluster name from database", zap.Error(err))
 		return 0, err
 	}
 	return id, nil
