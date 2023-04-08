@@ -1,16 +1,15 @@
-package postgres
+package helm
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
 	"github.com/gofrs/flock"
@@ -27,44 +26,62 @@ import (
 	"helm.sh/helm/v3/pkg/strvals"
 )
 
-var settings *cli.EnvSettings
-
 var (
-	url       = "https://charts.bitnami.com/bitnami"
-	repoName  = "bitnami"
 	chartName = "postgresql"
 	//releaseName = "postgresql-dev"
-	namespace = "default"
-	args      = map[string]string{
+	args = map[string]string{
 		// comma seperated values to set
 		"set": "primary.persistence.existingClaim=pg-pvc,auth.postgresPassword=pgpass",
 	}
 )
 
-func Install(releaseName string) error {
-	os.Setenv("HELM_NAMESPACE", namespace)
-	settings = cli.New()
-	// Add helm repo
-	_ = RepoAdd(repoName, url)
-	//if err != nil {
-	//	return err
-	//}
-	// Update charts from the helm repo
-	err := RepoUpdate()
-	if err != nil {
-		return err
+type HelmInstaller struct {
+	namespace string
+	repoUrl   string
+	repoName  string
+
+	l        *zap.Logger
+	settings *cli.EnvSettings
+}
+
+func NewHelmInstaller(namespace, repoUrl, repoName string, logger *zap.Logger) (*HelmInstaller, error) {
+	hi := &HelmInstaller{
+		namespace: namespace,
+		repoUrl:   repoUrl,
+		repoName:  repoName,
+		l:         logger,
 	}
+	os.Setenv("HELM_NAMESPACE", namespace)
+	hi.settings = cli.New()
+
+	// Add helm repo
+	err := hi.RepoAdd(hi.repoName, hi.repoUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update charts from the helm repo
+	err = hi.RepoUpdate()
+	if err != nil {
+		return nil, err
+	}
+
+	return hi, nil
+}
+
+func (hi *HelmInstaller) Install(releaseName, repoName string) error {
 	// Install charts
-	return InstallChart(releaseName, repoName, chartName, args)
+	return hi.InstallChart(releaseName, repoName, chartName, args)
 }
 
 // RepoAdd adds repo with given name and url
-func RepoAdd(name, url string) error {
-	repoFile := settings.RepositoryConfig
+func (hi *HelmInstaller) RepoAdd(name, url string) error {
+	repoFile := hi.settings.RepositoryConfig
 
 	//Ensure the file directory exists as it is required for file locking
 	err := os.MkdirAll(filepath.Dir(repoFile), os.ModePerm)
 	if err != nil && !os.IsExist(err) {
+		hi.l.Error("failed creating directory for helm repositories")
 		return err
 	}
 
@@ -80,7 +97,7 @@ func RepoAdd(name, url string) error {
 		return err
 	}
 
-	b, err := ioutil.ReadFile(repoFile)
+	b, err := os.ReadFile(repoFile)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -91,7 +108,8 @@ func RepoAdd(name, url string) error {
 	}
 
 	if f.Has(name) {
-		return fmt.Errorf("repository name (%s) already exists\n", name)
+		hi.l.Warn("repository name already exists", zap.String("repo_name", name))
+		return nil
 	}
 
 	c := repo.Entry{
@@ -99,7 +117,7 @@ func RepoAdd(name, url string) error {
 		URL:  url,
 	}
 
-	r, err := repo.NewChartRepository(&c, getter.All(settings))
+	r, err := repo.NewChartRepository(&c, getter.All(hi.settings))
 	if err != nil {
 		return err
 	}
@@ -114,13 +132,13 @@ func RepoAdd(name, url string) error {
 	if err := f.WriteFile(repoFile, 0644); err != nil {
 		return err
 	}
-	fmt.Printf("%q has been added to your repositories\n", name)
+	hi.l.Info("new repositories has been added", zap.String("repo_name", name))
 	return nil
 }
 
 // RepoUpdate updates charts for all helm repos
-func RepoUpdate() error {
-	repoFile := settings.RepositoryConfig
+func (hi *HelmInstaller) RepoUpdate() error {
+	repoFile := hi.settings.RepositoryConfig
 
 	f, err := repo.LoadFile(repoFile)
 	if os.IsNotExist(errors.Cause(err)) || len(f.Repositories) == 0 {
@@ -128,35 +146,36 @@ func RepoUpdate() error {
 	}
 	var repos []*repo.ChartRepository
 	for _, cfg := range f.Repositories {
-		r, err := repo.NewChartRepository(cfg, getter.All(settings))
+		r, err := repo.NewChartRepository(cfg, getter.All(hi.settings))
 		if err != nil {
 			return err
 		}
 		repos = append(repos, r)
 	}
 
-	fmt.Printf("Hang tight while we grab the latest from your chart repositories...\n")
+	hi.l.Info("Grabbing the latest from your chart repositories...")
 	var wg sync.WaitGroup
 	for _, re := range repos {
 		wg.Add(1)
 		go func(re *repo.ChartRepository) {
 			defer wg.Done()
 			if _, err := re.DownloadIndexFile(); err != nil {
-				fmt.Printf("...Unable to get an update from the %q chart repository (%s):\n\t%s\n", re.Config.Name, re.Config.URL, err)
+				hi.l.Error("Unable to get an update from the chart repository", zap.String("repo_name", re.Config.Name), zap.String("repo_url", re.Config.URL), zap.Error(err))
 			} else {
-				fmt.Printf("...Successfully got an update from the %q chart repository\n", re.Config.Name)
+				hi.l.Info("Successfully got an update from the chart repository", zap.String("repo_name", re.Config.Name))
 			}
 		}(re)
 	}
 	wg.Wait()
-	fmt.Printf("Update Complete. ⎈ Happy Helming!⎈\n")
+
+	hi.l.Info("Helm update complete")
 	return nil
 }
 
 // InstallChart installs chart
-func InstallChart(name, repo, chart string, args map[string]string) error {
+func (hi *HelmInstaller) InstallChart(name, repo, chart string, args map[string]string) error {
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug); err != nil {
+	if err := actionConfig.Init(hi.settings.RESTClientGetter(), hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
 		return err
 	}
 	client := action.NewInstall(actionConfig)
@@ -164,16 +183,17 @@ func InstallChart(name, repo, chart string, args map[string]string) error {
 	if client.Version == "" && client.Devel {
 		client.Version = ">0.0.0-0"
 	}
+
 	//name, chart, err := client.NameAndChart(args)
 	client.ReleaseName = name
-	cp, err := client.ChartPathOptions.LocateChart(fmt.Sprintf("%s/%s", repo, chart), settings)
+	cp, err := client.ChartPathOptions.LocateChart(fmt.Sprintf("%s/%s", repo, chart), hi.settings)
 	if err != nil {
 		return err
 	}
 
-	debug("CHART PATH: %s\n", cp)
+	hi.l.Debug("chart path", zap.String("chart_path", cp))
 
-	p := getter.All(settings)
+	p := getter.All(hi.settings)
 	valueOpts := &values.Options{}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
@@ -208,8 +228,8 @@ func InstallChart(name, repo, chart string, args map[string]string) error {
 					Keyring:          client.ChartPathOptions.Keyring,
 					SkipUpdate:       false,
 					Getters:          p,
-					RepositoryConfig: settings.RepositoryConfig,
-					RepositoryCache:  settings.RepositoryCache,
+					RepositoryConfig: hi.settings.RepositoryConfig,
+					RepositoryCache:  hi.settings.RepositoryCache,
 				}
 				if err := man.Update(); err != nil {
 					return err
@@ -220,7 +240,7 @@ func InstallChart(name, repo, chart string, args map[string]string) error {
 		}
 	}
 
-	client.Namespace = settings.Namespace()
+	client.Namespace = hi.settings.Namespace()
 	release, err := client.Run(chartRequested, vals)
 	if err != nil {
 		return err
@@ -237,15 +257,14 @@ func isChartInstallable(ch *chart.Chart) (bool, error) {
 	return false, errors.Errorf("%s charts are not installable", ch.Metadata.Type)
 }
 
-func debug(format string, v ...interface{}) {
-	format = fmt.Sprintf("[debug] %s\n", format)
-	log.Output(2, fmt.Sprintf(format, v...))
+func (hi *HelmInstaller) debug(format string, v ...interface{}) {
+	hi.l.Debug(fmt.Sprintf(format, v...))
 }
 
 // UninstallChart uninstalls chart
-func UninstallChart(name string) error {
+func (hi *HelmInstaller) UninstallChart(name string) error {
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug); err != nil {
+	if err := actionConfig.Init(hi.settings.RESTClientGetter(), hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
 		return err
 	}
 	client := action.NewUninstall(actionConfig)

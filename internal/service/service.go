@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm/postgres"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
@@ -19,6 +19,7 @@ type Service struct {
 	r  internal.Repository
 	l  *zap.Logger
 	tm *taskmanager.Manager
+	hi *helm.HelmInstaller
 
 	k8sInstaller *k8s_installer.Installer
 }
@@ -88,7 +89,7 @@ func (s *Service) RemoveNode(ctx context.Context, id int) error {
 func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, name string) error {
 	switch rType {
 	case internal.Postgres:
-		return postgres.Install(name)
+		return s.hi.Install(name, "postgresql")
 	default:
 		return errors.New("resource not implemented")
 	}
@@ -97,7 +98,7 @@ func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, 
 func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceType, name string) error {
 	switch rType {
 	case internal.Postgres:
-		return postgres.UninstallChart(name)
+		return s.hi.UninstallChart(name)
 	default:
 		return errors.New("resource not implemented")
 	}
