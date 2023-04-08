@@ -32,4 +32,7 @@ const (
 	Undefined ResourceType = iota
 	Postgres
 	Redis
+	Prometheus
+	Grafana
+	NginxIngressController
 )

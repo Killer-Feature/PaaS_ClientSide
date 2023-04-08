@@ -169,6 +169,10 @@ func ConvertResourceTypeToString(resource string) internal.ResourceType {
 		return internal.Postgres
 	case "redis":
 		return internal.Redis
+	case "prometheus":
+		return internal.Prometheus
+	case "grafana":
+		return internal.Grafana
 	default:
 	}
 	return internal.Undefined

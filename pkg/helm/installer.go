@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 	"helm.sh/helm/v3/pkg/kube"
@@ -73,9 +74,21 @@ func NewHelmInstaller(namespace, repoUrl, repoName string, logger *zap.Logger) (
 	return hi, nil
 }
 
-func (hi *HelmInstaller) Install(releaseName, chart string) error {
+func (hi *HelmInstaller) Install(releaseName string, rType internal.ResourceType) error {
 	// Install charts
-	return hi.InstallChart(releaseName, hi.repoName, chart, args)
+	switch rType {
+	case internal.Postgres:
+		return hi.InstallChart(releaseName, hi.repoName, "postgresql", args)
+	case internal.Redis:
+		return hi.InstallChart(releaseName, hi.repoName, "redis", nil)
+	case internal.Prometheus:
+		return hi.InstallChart(releaseName, hi.repoName, "prometheus", nil)
+	case internal.Grafana:
+		return hi.InstallChart(releaseName, hi.repoName, "grafana", nil)
+	case internal.NginxIngressController:
+		return hi.InstallChart(releaseName, hi.repoName, "nginx-ingress-controller", nil)
+	}
+	return errors.New("resource type not provided")
 }
 
 // RepoAdd adds repo with given name and url
