@@ -166,3 +166,11 @@ func (u *Ubuntu2004CommandLib) KubeadmJoin(ip netip.AddrPort, token, tokenHash s
 	cp = cp.WithArgs(ip.String(), "--token", token, "--discovery-token-ca-cert-hash", tokenHash)
 	return cp
 }
+
+func (u *Ubuntu2004CommandLib) CatAdminConfFile() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   cl.Command("sudo cat /etc/kubernetes/admin.conf"),
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}

@@ -6,11 +6,16 @@ import (
 	"log"
 	"net/http"
 	"net/netip"
+	"strconv"
 
 	echo "github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
+)
+
+const (
+	CLUSTER_ID_PARAM_NAME = "clusterId"
 )
 
 type Handler struct {
@@ -35,6 +40,7 @@ func (h *Handler) Register(s *echo.Echo) {
 	s.POST("/api/removeNodeFromCluster", h.RemoveNodeFromCluster)
 	s.POST("/api/addResource", h.AddResource)
 	s.POST("/api/removeResource", h.RemoveResource)
+	s.GET("/api/getAdminConfig", h.GetAdminConfig)
 
 	fsys, err := fs.Sub(ui, "dist")
 	if err != nil {
@@ -80,6 +86,7 @@ func (h *Handler) AddNodeToCluster(ctx echo.Context) error {
 	}
 
 	nodeID, err := h.u.AddNodeToCurrentCluster(ctx.Request().Context(), nodeData.ID)
+
 	if err != nil {
 		return ctx.NoContent(http.StatusInternalServerError)
 	}
@@ -172,4 +179,18 @@ func ConvertResourceTypeToString(resource string) internal.ResourceType {
 	default:
 	}
 	return internal.Undefined
+}
+
+func (h *Handler) GetAdminConfig(ctx echo.Context) error {
+	clusterIdStr := ctx.QueryParam(CLUSTER_ID_PARAM_NAME)
+	clusterId, err := strconv.Atoi(clusterIdStr)
+	if err != nil || clusterId <= 0 {
+		clusterId = 1
+		//return ctx.HTML(http.StatusBadRequest, err.Error())
+	}
+	conf, err := h.u.GetAdminConfig(ctx.Request().Context(), clusterId)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return ctx.JSON(http.StatusOK, conf)
 }
