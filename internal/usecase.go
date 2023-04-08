@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"net/netip"
 )
 
@@ -14,6 +15,7 @@ type Usecase interface {
 	AddNodeToCurrentCluster(ctx context.Context, id int) (int, error)
 	AddResource(ctx context.Context, rType ResourceType, name string) error
 	RemoveResource(ctx context.Context, rType ResourceType, name string) error
+	GetAdminConfig(ctx context.Context, clusterId int) (*models.AdminConfig, error)
 }
 
 var (

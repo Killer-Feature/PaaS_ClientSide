@@ -3,6 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
+	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
+	"strconv"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
@@ -11,6 +15,8 @@ import (
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/executor"
+
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
 
 	_ "github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 )
@@ -103,4 +109,44 @@ func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceTyp
 	default:
 		return errors.New("resource not implemented")
 	}
+}
+
+func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.AdminConfig, error) {
+	_, masterIdStr, _, err := s.r.GetClusterTokenIPAndHash(ctx, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	masterId, err := strconv.Atoi(masterIdStr)
+
+	node, err := s.r.GetFullNode(ctx, masterId)
+	if err != nil {
+		return nil, err
+	}
+
+	sshBuilder := ssh.NewSSHBuilder()
+	cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer func(cc cconn.ClientConn) {
+		_ = cc.Close()
+	}(cc)
+
+	cl := ubuntu.Ubuntu2004CommandLib{}
+
+	getAdminConfCommand := cl.CatAdminConfFile()
+
+	output, err := cc.Exec(string(getAdminConfCommand.Command))
+
+	if err == nil {
+		adminConf := string(output)
+		_ = s.r.UpdateAdminConf(ctx, clusterId, adminConf)
+		return &models.AdminConfig{Config: adminConf}, nil
+	}
+
+	adminConf, err := s.r.GetAdminConf(ctx, clusterId)
+	return &models.AdminConfig{Config: adminConf}, err
 }

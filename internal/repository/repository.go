@@ -56,7 +56,8 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		"name" TEXT UNIQUE,
 		"master_ip" TEXT,
 		"token" TEXT,	
-		"hash" TEXT
+		"hash" TEXT,
+		"admin_conf" TEXT
 	  );`
 
 	statement, err = db.Prepare(createClustersTableSQL)
@@ -276,6 +277,22 @@ func (r *Repository) GetClusterTokenIPAndHash(ctx context.Context, clusterID int
 	if rawHash.Valid {
 		hash = rawHash.String
 	}
+	return
+}
 
+func (r *Repository) UpdateAdminConf(ctx context.Context, clusterID int, adminConf string) (err error) {
+	sqlScript := "UPDATE clusters SET admin_conf = $1  WHERE id = $2"
+	_, err = r.db.ExecContext(ctx, sqlScript, adminConf, clusterID)
+	return err
+}
+
+func (r *Repository) GetAdminConf(ctx context.Context, clusterID int) (conf string, err error) {
+	var rawAdminConf sql.NullString
+	sqlScript := "SELECT admin_confh FROM clusters WHERE id = $1"
+	err = r.db.QueryRowContext(ctx, sqlScript, clusterID).Scan(&rawAdminConf)
+
+	if rawAdminConf.Valid {
+		conf = rawAdminConf.String
+	}
 	return
 }
