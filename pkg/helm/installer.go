@@ -27,8 +27,6 @@ import (
 )
 
 var (
-	chartName = "postgresql"
-	//releaseName = "postgresql-dev"
 	args = map[string]string{
 		// comma seperated values to set
 		"set": "primary.persistence.existingClaim=pg-pvc,auth.postgresPassword=pgpass",
@@ -69,9 +67,9 @@ func NewHelmInstaller(namespace, repoUrl, repoName string, logger *zap.Logger) (
 	return hi, nil
 }
 
-func (hi *HelmInstaller) Install(releaseName, repoName string) error {
+func (hi *HelmInstaller) Install(releaseName, chart string) error {
 	// Install charts
-	return hi.InstallChart(releaseName, repoName, chartName, args)
+	return hi.InstallChart(releaseName, hi.repoName, chart, args)
 }
 
 // RepoAdd adds repo with given name and url
