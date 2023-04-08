@@ -156,7 +156,7 @@ func (h *Handler) RemoveResource(ctx echo.Context) error {
 		return ctx.NoContent(http.StatusInternalServerError)
 	}
 
-	err := h.u.AddResource(ctx.Request().Context(), ConvertResourceTypeToString(rData.Type), rData.Name)
+	err := h.u.RemoveResource(ctx.Request().Context(), ConvertResourceTypeToString(rData.Type), rData.Name)
 	if err != nil {
 		return ctx.HTML(http.StatusInternalServerError, err.Error())
 	}

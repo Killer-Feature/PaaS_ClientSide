@@ -242,8 +242,8 @@ func debug(format string, v ...interface{}) {
 	log.Output(2, fmt.Sprintf(format, v...))
 }
 
-// UnnstallChart uninstalls chart
-func UnnstallChart(name string) error {
+// UninstallChart uninstalls chart
+func UninstallChart(name string) error {
 	actionConfig := new(action.Configuration)
 	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug); err != nil {
 		return err

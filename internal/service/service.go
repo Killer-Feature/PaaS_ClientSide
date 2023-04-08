@@ -97,7 +97,7 @@ func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, 
 func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceType, name string) error {
 	switch rType {
 	case internal.Postgres:
-		return postgres.UnnstallChart(name)
+		return postgres.UninstallChart(name)
 	default:
 		return errors.New("resource not implemented")
 	}
