@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/labstack/echo/v4/middleware"
 	"log"
 	"net/http"
 
@@ -60,6 +61,14 @@ func main() {
 
 	//m := middleware.NewMiddleware(p.Logger, metrics)
 	//m.Register(server)
+	server.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     []string{"*"},
+		AllowCredentials: true,
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderXCSRFToken},
+		AllowMethods:     []string{echo.GET, echo.POST, echo.OPTIONS, echo.PUT},
+		ExposeHeaders:    []string{echo.HeaderXCSRFToken},
+		MaxAge:           86400,
+	}))
 
 	g.Go(func() error {
 		return server.Start(":80")
