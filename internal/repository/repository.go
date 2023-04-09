@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"net/netip"
 	"os"
+	"strconv"
 
 	_ "github.com/mattn/go-sqlite3" // Import go-sqlite3 library
 	"go.uber.org/zap"
@@ -33,15 +35,36 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		return nil, err
 	}
 
+	createClustersTableSQL := `CREATE TABLE IF NOT EXISTS clusters (
+		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+		"name" TEXT UNIQUE,
+		"master_ip" TEXT,
+		"token" TEXT,	
+		"hash" TEXT,
+		"admin_conf" TEXT,
+		"master_id" integer
+	  );`
+
+	statement, err := db.Prepare(createClustersTableSQL)
+	if err != nil {
+		l.Error("error occurred during preparing cluster table creating statement", zap.Error(err))
+	}
+	_, err = statement.Exec()
+	if err != nil {
+		l.Error("error occurred during execution cluster table creating statement", zap.Error(err))
+		return nil, err
+	}
 	createNodesTableSQL := `CREATE TABLE IF NOT EXISTS nodes (
 		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
 		"name" TEXT,
 		"ip" TEXT,	
 		"login" TEXT,
-		"password" TEXT
+		"cluster_id" integer,
+		"password" TEXT,
+		FOREIGN KEY(cluster_id) REFERENCES clusters(id)
 	  );`
 
-	statement, err := db.Prepare(createNodesTableSQL)
+	statement, err = db.Prepare(createNodesTableSQL)
 	if err != nil {
 		l.Error("error occurred during preparing table creating statement", zap.Error(err))
 	}
@@ -51,24 +74,22 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		return nil, err
 	}
 
-	createClustersTableSQL := `CREATE TABLE IF NOT EXISTS clusters (
+	createResourcesTableSQL := `CREATE TABLE IF NOT EXISTS resources (
 		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-		"name" TEXT UNIQUE,
-		"master_ip" TEXT,
-		"token" TEXT,	
-		"hash" TEXT,
-		"admin_conf" TEXT
+		"name" TEXT,
+		"type" TEXT
 	  );`
 
-	statement, err = db.Prepare(createClustersTableSQL)
+	statement, err = db.Prepare(createResourcesTableSQL)
 	if err != nil {
-		l.Error("error occurred during preparing cluster table creating statement", zap.Error(err))
+		l.Error("error occurred during preparing table creating statement", zap.Error(err))
 	}
 	_, err = statement.Exec()
 	if err != nil {
-		l.Error("error occurred during execution cluster table creating statement", zap.Error(err))
+		l.Error("error occurred during execution table creating statement", zap.Error(err))
 		return nil, err
 	}
+
 	l.Debug("repository created")
 
 	r := &Repository{
@@ -80,7 +101,7 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 }
 
 func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) {
-	sqlScript := "SELECT id, name, ip, login, password FROM nodes;"
+	sqlScript := "SELECT id, name, ip, login, password, cluster_id FROM nodes;"
 
 	rows, err := r.db.QueryContext(ctx, sqlScript)
 	if err != nil {
@@ -93,11 +114,13 @@ func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) 
 	for rows.Next() {
 		var singleNode internal.FullNode
 		var ip string
-		if err = rows.Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password); err != nil {
+		var clusterId sql.NullString
+		if err = rows.Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password, &clusterId); err != nil {
 			r.l.Error("error during scanning node from database", zap.Error(err))
 			return nil, err
 		}
 		singleNode.IP, err = netip.ParseAddrPort(ip)
+		singleNode.ClusterID, _ = strconv.Atoi(clusterId.String)
 		if err != nil {
 			r.l.Error("error during parsing ip from database", zap.Error(err))
 		}
@@ -250,6 +273,12 @@ func (r *Repository) AddClusterTokenIPAndHash(ctx context.Context, clusterID int
 	if err != nil {
 		return err
 	}
+
+	sqlScript = "UPDATE nodes SET cluster_id = $1 WHERE ip = $2"
+	_, err = r.db.ExecContext(ctx, sqlScript, clusterID, masterIP)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -295,4 +324,37 @@ func (r *Repository) GetAdminConf(ctx context.Context, clusterID int) (conf stri
 		conf = rawAdminConf.String
 	}
 	return
+}
+
+func (r *Repository) GetResources(ctx context.Context) ([]models.ResourceData, error) {
+	sqlScript := "SELECT name, type FROM resources;"
+
+	rows, err := r.db.QueryContext(ctx, sqlScript)
+	if err != nil {
+		r.l.Error("error in db query during getting nodes", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var selectedResources []models.ResourceData
+	for rows.Next() {
+		var singleNode models.ResourceData
+		if err = rows.Scan(&singleNode.Name, &singleNode.Type); err != nil {
+			r.l.Error("error during scanning node from database", zap.Error(err))
+			return nil, err
+		}
+		selectedResources = append(selectedResources, singleNode)
+	}
+
+	return selectedResources, nil
+}
+
+func (r *Repository) AddResource(ctx context.Context, rType, name string) error {
+	sqlScript := "INSERT INTO resources(type, name) VALUES ($1, $2);"
+	_, err := r.db.ExecContext(ctx, sqlScript, rType, name)
+	if err != nil {
+		r.l.Error("error during adding cluster to database", zap.Error(err))
+		return err
+	}
+	return nil
 }

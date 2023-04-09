@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"log"
 	"net/http"
+	"net/netip"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
@@ -47,7 +48,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("database creating error", zap.Error(err))
 	}
-	tm := taskmanager.NewTaskManager(ctx, servLogger)
+	tm := taskmanager.NewTaskManager[netip.AddrPort](ctx, servLogger)
 	k8sinstaller := k8s_installer.NewInstaller(logger, r)
 	hi, err := helm.NewHelmInstaller("default", "https://charts.bitnami.com/bitnami", "bitnami", logger)
 	if err != nil {
