@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
+
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
 	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
-	"strconv"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
@@ -96,7 +97,7 @@ func (s *Service) RemoveNode(ctx context.Context, id int) error {
 func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, name string) error {
 	switch rType {
 	case internal.Postgres:
-		return s.hi.Install(name, "postgresql")
+		return s.hi.Install(name, rType)
 	default:
 		return errors.New("resource not implemented")
 	}

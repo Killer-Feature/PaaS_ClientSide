@@ -27,19 +27,26 @@ func NewHandler(logger *zap.Logger, u internal.Usecase) *Handler {
 	return &Handler{logger: logger, u: u}
 }
 
-//go:embed dist
+//go:embed dist/assets
 var ui embed.FS
+
+//go:embed dist/index.html
+var htmlPage string
 
 func (h *Handler) Register(s *echo.Echo) {
 	// Register http handlers
 	s.GET("/hello", h.GetHello)
 	s.GET("/api/getClusterNodes", h.GetClusterNodes)
+
 	s.POST("/api/addNode", h.AddNode)
 	s.POST("/api/addNodeToCluster", h.AddNodeToCluster)
+
 	s.POST("/api/removeNode", h.RemoveNode)
 	s.POST("/api/removeNodeFromCluster", h.RemoveNodeFromCluster)
+
 	s.POST("/api/addResource", h.AddResource)
 	s.POST("/api/removeResource", h.RemoveResource)
+
 	s.GET("/api/getAdminConfig", h.GetAdminConfig)
 
 	fsys, err := fs.Sub(ui, "dist")
@@ -47,7 +54,10 @@ func (h *Handler) Register(s *echo.Echo) {
 		log.Fatal(err)
 	}
 
-	s.GET("/*", echo.WrapHandler(http.FileServer(http.FS(fsys))))
+	s.GET("/assets/*", echo.WrapHandler(http.FileServer(http.FS(fsys))))
+	s.GET("/*", func(c echo.Context) error {
+		return c.HTML(http.StatusOK, htmlPage)
+	})
 }
 
 func (h *Handler) GetHello(c echo.Context) error {
@@ -180,6 +190,8 @@ func ConvertResourceTypeToString(resource string) internal.ResourceType {
 		return internal.Prometheus
 	case "grafana":
 		return internal.Grafana
+	case "nginx-ingress-controller":
+		return internal.NginxIngressController
 	default:
 	}
 	return internal.Undefined

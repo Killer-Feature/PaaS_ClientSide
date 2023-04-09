@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	args = map[string]string{
+	prometheusArgs = map[string]string{
 		// comma seperated values to set
 		"set": "global.storageClass=local-storage,primary.persistence.size=4Gi,auth.postgresPassword=pgpass",
 	}
@@ -78,7 +78,7 @@ func (hi *HelmInstaller) Install(releaseName string, rType internal.ResourceType
 	// Install charts
 	switch rType {
 	case internal.Postgres:
-		return hi.InstallChart(releaseName, hi.repoName, "postgresql", args)
+		return hi.InstallChart(releaseName, hi.repoName, "postgresql", prometheusArgs)
 	case internal.Redis:
 		return hi.InstallChart(releaseName, hi.repoName, "redis", nil)
 	case internal.Prometheus:
