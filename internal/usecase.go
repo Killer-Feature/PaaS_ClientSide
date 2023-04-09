@@ -23,9 +23,10 @@ var (
 )
 
 type Node struct {
-	ID   int            `json:"id"`
-	IP   netip.AddrPort `json:"ip"`
-	Name string         `json:"name"`
+	ID        int            `json:"id"`
+	IP        netip.AddrPort `json:"ip"`
+	Name      string         `json:"name"`
+	ClusterID int            `json:"clusterID"`
 }
 
 type ResourceType int

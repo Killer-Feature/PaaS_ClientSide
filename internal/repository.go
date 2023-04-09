@@ -23,9 +23,10 @@ type Repository interface {
 }
 
 type FullNode struct {
-	ID       int
-	Name     string
-	IP       netip.AddrPort
-	Login    string
-	Password string
+	ID        int
+	Name      string
+	IP        netip.AddrPort
+	Login     string
+	Password  string
+	ClusterID int
 }
