@@ -12,6 +12,7 @@ type Repository interface {
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
 	IsNodeExists(ctx context.Context, ip netip.AddrPort) (bool, error)
+	SetNodeClusterID(ctx context.Context, id int, clusterID int) error
 
 	AddResource(ctx context.Context, rType, name string) error
 	GetResources(ctx context.Context) ([]models.ResourceData, error)
@@ -33,4 +34,5 @@ type FullNode struct {
 	Login     string
 	Password  string
 	ClusterID int
+	IsMaster  bool
 }

@@ -29,6 +29,10 @@ import (
 	"helm.sh/helm/v3/pkg/strvals"
 )
 
+const (
+	dateTimeFormat = "2 January 15:04:05, 2006"
+)
+
 var (
 	prometheusArgs = map[string]string{
 		// comma seperated values to set
@@ -289,4 +293,44 @@ func (hi *HelmInstaller) UninstallChart(name string) error {
 	resp, err := client.Run(name)
 	fmt.Println(resp)
 	return err
+}
+
+type Resourse struct {
+	Name          string
+	Status        string
+	FirstDeployed string
+	LastDeployed  string
+	AppVersion    string
+	ApiVersion    string
+	Description   string
+	ChartVersion  string
+}
+
+func (hi *HelmInstaller) GetResourcesList() ([]Resourse, error) {
+	actionConfig := new(action.Configuration)
+	if err := actionConfig.Init(hi.config, hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
+		return nil, err
+	}
+	client := action.NewList(actionConfig)
+
+	resources, err := client.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	resourceList := make([]Resourse, 0, len(resources))
+	for _, res := range resources {
+		resourceList = append(resourceList, Resourse{
+			Name:          res.Name,
+			Status:        res.Info.Status.String(),
+			FirstDeployed: res.Info.FirstDeployed.Format(dateTimeFormat),
+			LastDeployed:  res.Info.LastDeployed.Format(dateTimeFormat),
+			AppVersion:    res.Chart.Metadata.AppVersion,
+			Description:   res.Chart.Metadata.Description,
+			ChartVersion:  res.Chart.Metadata.Version,
+			ApiVersion:    res.Chart.Metadata.APIVersion,
+		})
+	}
+
+	return resourceList, err
 }
