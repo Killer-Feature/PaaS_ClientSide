@@ -217,5 +217,8 @@ func (h *Handler) GetResources(ctx echo.Context) error {
 	if err != nil {
 		return ctx.HTML(http.StatusInternalServerError, err.Error())
 	}
+	if resources == nil {
+		return ctx.NoContent(http.StatusOK)
+	}
 	return ctx.JSON(http.StatusOK, resources)
 }

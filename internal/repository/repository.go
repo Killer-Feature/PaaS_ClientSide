@@ -61,6 +61,7 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		"login" TEXT,
 		"cluster_id" integer,
 		"password" TEXT,
+		"is_master" BOOLEAN,
 		FOREIGN KEY(cluster_id) REFERENCES clusters(id)
 	  );`
 
@@ -101,7 +102,7 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 }
 
 func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) {
-	sqlScript := "SELECT id, name, ip, login, password, cluster_id FROM nodes;"
+	sqlScript := "SELECT id, name, ip, login, password, cluster_id, is_master FROM nodes;"
 
 	rows, err := r.db.QueryContext(ctx, sqlScript)
 	if err != nil {
@@ -115,10 +116,12 @@ func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) 
 		var singleNode internal.FullNode
 		var ip string
 		var clusterId sql.NullString
-		if err = rows.Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password, &clusterId); err != nil {
+		var isMaster sql.NullBool
+		if err = rows.Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password, &clusterId, &isMaster); err != nil {
 			r.l.Error("error during scanning node from database", zap.Error(err))
 			return nil, err
 		}
+		singleNode.IsMaster = isMaster.Bool
 		singleNode.IP, err = netip.ParseAddrPort(ip)
 		singleNode.ClusterID, _ = strconv.Atoi(clusterId.String)
 		if err != nil {
@@ -131,16 +134,20 @@ func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) 
 }
 
 func (r *Repository) GetFullNode(ctx context.Context, id int) (internal.FullNode, error) {
-	sqlScript := "SELECT id, name, ip, login, password FROM nodes WHERE id = $1"
+	sqlScript := "SELECT id, name, ip, login, password, cluster_id, is_master FROM nodes WHERE id = $1"
 
 	var singleNode internal.FullNode
 	var ip string
-	err := r.db.QueryRowContext(ctx, sqlScript, id).Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password)
+	var clusterId sql.NullString
+	var isMaster sql.NullBool
+	err := r.db.QueryRowContext(ctx, sqlScript, id).Scan(&singleNode.ID, &singleNode.Name, &ip, &singleNode.Login, &singleNode.Password, &clusterId, &isMaster)
 	if err != nil {
 		r.l.Error("error in db query during getting nodes", zap.Error(err))
 		return internal.FullNode{}, err
 	}
 	singleNode.IP, err = netip.ParseAddrPort(ip)
+	singleNode.IsMaster = isMaster.Bool
+	singleNode.ClusterID, _ = strconv.Atoi(clusterId.String)
 	if err != nil {
 		r.l.Error("error during parsing ip from database", zap.Error(err))
 		return internal.FullNode{}, err
@@ -167,6 +174,15 @@ func (r *Repository) RemoveNode(ctx context.Context, id int) error {
 	sqlScript := "DELETE FROM nodes WHERE id=$1;"
 	_, err := r.db.ExecContext(ctx, sqlScript, id)
 	return err
+}
+
+func (r *Repository) SetNodeClusterID(ctx context.Context, id int, clusterID int) error {
+	sqlScript := "UPDATE nodes SET cluster_id = $1 WHERE id = $2"
+	_, err := r.db.ExecContext(ctx, sqlScript, clusterID, id)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *Repository) IsNodeExists(ctx context.Context, ip netip.AddrPort) (bool, error) {
@@ -274,8 +290,8 @@ func (r *Repository) AddClusterTokenIPAndHash(ctx context.Context, clusterID int
 		return err
 	}
 
-	sqlScript = "UPDATE nodes SET cluster_id = $1 WHERE ip = $2"
-	_, err = r.db.ExecContext(ctx, sqlScript, clusterID, masterIP)
+	sqlScript = "UPDATE nodes SET is_master = $1 WHERE ip = $2"
+	_, err = r.db.ExecContext(ctx, sqlScript, true, masterIP)
 	if err != nil {
 		return err
 	}

@@ -18,8 +18,6 @@ import (
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/executor"
-
-	_ "github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 )
 
 type Service struct {
@@ -59,6 +57,7 @@ func (s *Service) GetClusterNodes(ctx context.Context) ([]internal.Node, error) 
 			IP:        node.IP,
 			Name:      node.Name,
 			ClusterID: node.ClusterID,
+			IsMaster:  node.IsMaster,
 		}
 	}
 
@@ -85,7 +84,11 @@ func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node 
 		defer func(cc cconn.ClientConn) {
 			_ = cc.Close()
 		}(cc)
-		return s.k8sInstaller.InstallK8S(cc)
+		err = s.k8sInstaller.InstallK8S(cc)
+		if err != nil {
+			return err
+		}
+		return s.r.SetNodeClusterID(ctx, node.ID, 1)
 	}
 }
 
@@ -105,12 +108,26 @@ func (s *Service) RemoveNode(ctx context.Context, id int) error {
 }
 
 func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, name string) error {
-	switch rType {
-	case internal.Postgres:
-		return s.hi.Install(name, rType)
-	default:
-		return errors.New("resource not implemented")
+	err := s.hi.Install(name, rType)
+	if err != nil {
+		return err
 	}
+	return s.r.AddResource(ctx, convertResourceTypeToString(rType), name)
+}
+
+func convertResourceTypeToString(rtype internal.ResourceType) string {
+	switch rtype {
+	case internal.Postgres:
+		return "postgres"
+	case internal.Redis:
+		return "redis"
+	case internal.Prometheus:
+		return "prometheus"
+	case internal.Grafana:
+		return "grafana"
+	default:
+	}
+	return "unknown"
 }
 
 func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceType, name string) error {
@@ -162,7 +179,26 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 	return &models.AdminConfig{Config: adminConf}, err
 }
 
-func (s *Service) GetResources(ctx context.Context) ([]models.ResourceData, error) {
+func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error) {
+	resources, err := s.hi.GetResourcesList()
 
-	return nil, nil
+	if err != nil {
+		return nil, err
+	}
+
+	resourceList := make([]internal.Resourse, 0, len(resources))
+
+	for _, res := range resources {
+		resourceList = append(resourceList, internal.Resourse{
+			Name:          res.Name,
+			Status:        res.Status,
+			FirstDeployed: res.FirstDeployed,
+			LastDeployed:  res.LastDeployed,
+			AppVersion:    res.AppVersion,
+			Description:   res.Description,
+			ChartVersion:  res.ChartVersion,
+			ApiVersion:    res.ApiVersion,
+		})
+	}
+	return resourceList, nil
 }
