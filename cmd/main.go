@@ -73,7 +73,7 @@ func main() {
 	}))
 
 	g.Go(func() error {
-		return server.Start(":8091")
+		return server.Start(":80")
 	})
 
 	if err := g.Wait(); err != nil {
