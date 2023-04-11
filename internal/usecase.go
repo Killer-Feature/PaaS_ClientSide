@@ -3,8 +3,9 @@ package internal
 import (
 	"context"
 	"errors"
-	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"net/netip"
+
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 )
 
 type Usecase interface {
@@ -16,6 +17,7 @@ type Usecase interface {
 	AddResource(ctx context.Context, rType ResourceType, name string) error
 	RemoveResource(ctx context.Context, rType ResourceType, name string) error
 	GetAdminConfig(ctx context.Context, clusterId int) (*models.AdminConfig, error)
+	RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error)
 }
 
 var (
@@ -37,4 +39,5 @@ const (
 	Prometheus
 	Grafana
 	NginxIngressController
+	MetalLB
 )

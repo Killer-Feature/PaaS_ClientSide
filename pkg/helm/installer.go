@@ -60,16 +60,13 @@ func NewHelmInstaller(namespace, repoUrl, repoName string, logger *zap.Logger) (
 	hi.config = kube.GetConfig("./config", "", namespace)
 
 	// Add helm repo
-	err := hi.RepoAdd(hi.repoName, hi.repoUrl)
-	if err != nil {
-		return nil, err
-	}
+	_ = hi.RepoAdd(hi.repoName, hi.repoUrl)
+
+	// Add meatllb repo
+	_ = hi.RepoAdd("metallb", "https://metallb.github.io/metallb")
 
 	// Update charts from the helm repo
-	err = hi.RepoUpdate()
-	if err != nil {
-		return nil, err
-	}
+	_ = hi.RepoUpdate()
 
 	return hi, nil
 }
@@ -87,6 +84,8 @@ func (hi *HelmInstaller) Install(releaseName string, rType internal.ResourceType
 		return hi.InstallChart(releaseName, hi.repoName, "grafana", nil)
 	case internal.NginxIngressController:
 		return hi.InstallChart(releaseName, hi.repoName, "nginx-ingress-controller", nil)
+	case internal.MetalLB:
+		return hi.InstallChart(releaseName, "metallb", "metallb", nil)
 	}
 	return errors.New("resource type not provided")
 }

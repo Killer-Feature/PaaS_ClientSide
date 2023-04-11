@@ -104,12 +104,7 @@ func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, 
 }
 
 func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceType, name string) error {
-	switch rType {
-	case internal.Postgres:
-		return s.hi.UninstallChart(name)
-	default:
-		return errors.New("resource not implemented")
-	}
+	return s.hi.UninstallChart(name)
 }
 
 func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.AdminConfig, error) {
@@ -150,4 +145,17 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 
 	adminConf, err := s.r.GetAdminConf(ctx, clusterId)
 	return &models.AdminConfig{Config: adminConf}, err
+}
+
+func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error) {
+	node, err := s.r.GetFullNode(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+
+	taskID, err := s.tm.AddTask(s.k8sInstaller.RemoveK8S, node.IP, taskmanager.AuthData{
+		Login:    node.Login,
+		Password: node.Password,
+	})
+	return int(taskID), err
 }

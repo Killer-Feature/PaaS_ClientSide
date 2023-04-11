@@ -140,6 +140,14 @@ func (u *Ubuntu2004CommandLib) InitKubeadm(parser cl.Parser) cl.CommandAndParser
 	}
 }
 
+func (u *Ubuntu2004CommandLib) UntaintControlPlane() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "kubectl taint nodes --all node-role.kubernetes.io/control-plane-",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
 func (u *Ubuntu2004CommandLib) AddKubeConfig() cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "rm -r  $HOME/.kube \n mkdir -p $HOME/.kube\nsudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config\nsudo chown $(id -u):$(id -g) $HOME/.kube/config",
@@ -164,6 +172,69 @@ func (u *Ubuntu2004CommandLib) KubeadmJoin(ip netip.AddrPort, token, tokenHash s
 		Condition: 0,
 	}
 	cp = cp.WithArgs(ip.String(), "--token", token, "--discovery-token-ca-cert-hash", tokenHash)
+	return cp
+}
+
+func (u *Ubuntu2004CommandLib) KubeadmReset() cl.CommandAndParser {
+	cp := cl.CommandAndParser{
+		Command:   "sudo kubeadm reset",
+		Parser:    nil,
+		Condition: cl.Anyway,
+	}
+	return cp
+}
+
+func (u *Ubuntu2004CommandLib) StopKubelet() cl.CommandAndParser {
+	cp := cl.CommandAndParser{
+		Command:   "sudo systemctl stop kubelet",
+		Parser:    nil,
+		Condition: cl.Anyway,
+	}
+	return cp
+}
+
+func (u *Ubuntu2004CommandLib) StopCRIO() cl.CommandAndParser {
+	cp := cl.CommandAndParser{
+		Command:   "sudo systemctl stop crio.service",
+		Parser:    nil,
+		Condition: cl.Anyway,
+	}
+	return cp
+}
+
+func (u *Ubuntu2004CommandLib) LinkDownCNI0() cl.CommandAndParser {
+	cp := cl.CommandAndParser{
+		Command:   "sudo ip link set cni0 down",
+		Parser:    nil,
+		Condition: cl.Anyway,
+	}
+	return cp
+}
+
+func (u *Ubuntu2004CommandLib) IpconfigCNI0Down() cl.CommandAndParser {
+	cp := cl.CommandAndParser{
+		Command:   "sudo ifconfig cni0 down",
+		Parser:    nil,
+		Condition: cl.Anyway,
+	}
+	return cp
+}
+
+func (u *Ubuntu2004CommandLib) IpconfigFlannelDown() cl.CommandAndParser {
+	cp := cl.CommandAndParser{
+		Command:   "sudo ifconfig flannel.1 down",
+		Parser:    nil,
+		Condition: cl.Anyway,
+	}
+	return cp
+}
+
+func (u *Ubuntu2004CommandLib) BrctlDelbr() cl.CommandAndParser {
+	cp := cl.CommandAndParser{
+		Command:   "sudo brctl delbr cni0",
+		Parser:    nil,
+		Condition: cl.Anyway,
+	}
 	return cp
 }
 

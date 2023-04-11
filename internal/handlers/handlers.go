@@ -144,7 +144,18 @@ func (h *Handler) RemoveNode(ctx echo.Context) error {
 }
 
 func (h *Handler) RemoveNodeFromCluster(ctx echo.Context) error {
-	return ctx.HTML(http.StatusInternalServerError, "not implemented")
+	nodeData := NodeID{}
+	if err := ctx.Bind(&nodeData); err != nil {
+		h.logger.Error("error occurred during parsing nodeData", zap.Error(err))
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+
+	nodeID, err := h.u.RemoveNodeFromCurrentCluster(ctx.Request().Context(), nodeData.ID)
+
+	if err != nil {
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+	return ctx.JSON(http.StatusOK, nodeID)
 }
 
 type ResourceData struct {

@@ -53,8 +53,24 @@ func (installer *Installer) kubeadmInit() []cl.CommandAndParser {
 
 	commands := []cl.CommandAndParser{
 		commandLib.InitKubeadm(installer.parseKubeadmInit),
+		commandLib.UntaintControlPlane(),
 		commandLib.AddKubeConfig(),
 		commandLib.AddFlannel(),
+	}
+	return commands
+}
+
+func (installer *Installer) kubeadmReset() []cl.CommandAndParser {
+	commandLib := ubuntu.Ubuntu2004CommandLib{}
+
+	commands := []cl.CommandAndParser{
+		commandLib.KubeadmReset(),
+		commandLib.StopKubelet(),
+		commandLib.StopCRIO(),
+		commandLib.LinkDownCNI0(),
+		commandLib.IpconfigCNI0Down(),
+		commandLib.IpconfigFlannelDown(),
+		commandLib.BrctlDelbr(),
 	}
 	return commands
 }
@@ -119,6 +135,27 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn) error {
 				return err
 			}
 
+		}
+	}
+	return nil
+}
+
+func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
+	kubeadmStopCommands := installer.kubeadmReset()
+
+	for i, command := range kubeadmStopCommands {
+		exec, err := conn.Exec(string(command.Command))
+		installer.l.Info("installation percent", zap.Int("percent", (i+1)*100/len(kubeadmStopCommands)))
+		if err != nil && command.Condition != cl.Anyway {
+			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
+			return err
+		}
+
+		if command.Parser != nil {
+			err = command.Parser(exec, nil)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
