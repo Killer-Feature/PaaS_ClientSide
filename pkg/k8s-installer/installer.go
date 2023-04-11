@@ -53,8 +53,8 @@ func (installer *Installer) kubeadmInit() []cl.CommandAndParser {
 
 	commands := []cl.CommandAndParser{
 		commandLib.InitKubeadm(installer.parseKubeadmInit),
-		commandLib.UntaintControlPlane(),
 		commandLib.AddKubeConfig(),
+		commandLib.UntaintControlPlane(),
 		commandLib.AddFlannel(),
 	}
 	return commands
