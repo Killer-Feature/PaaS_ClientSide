@@ -48,6 +48,7 @@ func (h *Handler) Register(s *echo.Echo) {
 	s.POST("/api/removeResource", h.RemoveResource)
 
 	s.GET("/api/getAdminConfig", h.GetAdminConfig)
+	s.GET("/api/getResources", h.GetResources)
 
 	fsys, err := fs.Sub(ui, "dist")
 	if err != nil {
@@ -220,4 +221,15 @@ func (h *Handler) GetAdminConfig(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return ctx.JSON(http.StatusOK, conf)
+}
+
+func (h *Handler) GetResources(ctx echo.Context) error {
+	resources, err := h.u.GetResources(ctx.Request().Context())
+	if err != nil {
+		return ctx.HTML(http.StatusInternalServerError, err.Error())
+	}
+	if resources == nil {
+		return ctx.NoContent(http.StatusOK)
+	}
+	return ctx.JSON(http.StatusOK, resources)
 }

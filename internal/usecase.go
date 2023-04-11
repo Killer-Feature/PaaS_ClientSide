@@ -17,6 +17,7 @@ type Usecase interface {
 	AddResource(ctx context.Context, rType ResourceType, name string) error
 	RemoveResource(ctx context.Context, rType ResourceType, name string) error
 	GetAdminConfig(ctx context.Context, clusterId int) (*models.AdminConfig, error)
+	GetResources(ctx context.Context) ([]Resourse, error)
 	RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error)
 }
 
@@ -25,12 +26,25 @@ var (
 )
 
 type Node struct {
-	ID   int            `json:"id"`
-	IP   netip.AddrPort `json:"ip"`
-	Name string         `json:"name"`
+	ID        int            `json:"id"`
+	IP        netip.AddrPort `json:"ip"`
+	Name      string         `json:"name"`
+	ClusterID int            `json:"clusterID"`
+	IsMaster  bool           `json:"isMaster"`
 }
 
 type ResourceType int
+
+type Resourse struct {
+	Name          string `json:"name"`
+	Status        string `json:"status"`
+	FirstDeployed string `json:"firstDeployed"`
+	LastDeployed  string `json:"lastDeployed"`
+	AppVersion    string `json:"appVersion"`
+	ApiVersion    string `json:"apiVersion"`
+	Description   string `json:"description"`
+	ChartVersion  string `json:"chartVersion"`
+}
 
 const (
 	Undefined ResourceType = iota

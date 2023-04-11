@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
-	"strconv"
-
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
 	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
+	"net/netip"
+	"strconv"
+
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
@@ -16,22 +18,18 @@ import (
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/executor"
-
-	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
-
-	_ "github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 )
 
 type Service struct {
 	r  internal.Repository
 	l  *zap.Logger
-	tm *taskmanager.Manager
+	tm *taskmanager.Manager[netip.AddrPort]
 	hi *helm.HelmInstaller
 
 	k8sInstaller *k8s_installer.Installer
 }
 
-func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager, k8sInstaller *k8s_installer.Installer, hi *helm.HelmInstaller) internal.Usecase {
+func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager[netip.AddrPort], k8sInstaller *k8s_installer.Installer, hi *helm.HelmInstaller) internal.Usecase {
 	return &Service{
 		r:            r,
 		l:            l,
@@ -55,9 +53,11 @@ func (s *Service) GetClusterNodes(ctx context.Context) ([]internal.Node, error) 
 
 	for i, node := range nodes {
 		respNodes[i] = internal.Node{
-			ID:   node.ID,
-			IP:   node.IP,
-			Name: node.Name,
+			ID:        node.ID,
+			IP:        node.IP,
+			Name:      node.Name,
+			ClusterID: node.ClusterID,
+			IsMaster:  node.IsMaster,
 		}
 	}
 
@@ -65,18 +65,31 @@ func (s *Service) GetClusterNodes(ctx context.Context) ([]internal.Node, error) 
 }
 
 func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, error) {
-	// TODO: Add task
-
 	node, err := s.r.GetFullNode(ctx, id)
 	if err != nil {
 		return 0, err
 	}
 
-	taskID, err := s.tm.AddTask(s.k8sInstaller.InstallK8S, node.IP, taskmanager.AuthData{
-		Login:    node.Login,
-		Password: node.Password,
-	})
+	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(ctx, node), node.IP)
 	return int(taskID), err
+}
+
+func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
+	return func(taskID taskmanager.ID) error {
+		sshBuilder := ssh.NewSSHBuilder()
+		cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
+		if err != nil {
+			return err
+		}
+		defer func(cc cconn.ClientConn) {
+			_ = cc.Close()
+		}(cc)
+		err = s.k8sInstaller.InstallK8S(cc)
+		if err != nil {
+			return err
+		}
+		return s.r.SetNodeClusterID(ctx, node.ID, 1)
+	}
 }
 
 func (s *Service) AddNode(ctx context.Context, node internal.FullNode) (int, error) {
@@ -95,12 +108,26 @@ func (s *Service) RemoveNode(ctx context.Context, id int) error {
 }
 
 func (s *Service) AddResource(ctx context.Context, rType internal.ResourceType, name string) error {
-	switch rType {
-	case internal.Postgres:
-		return s.hi.Install(name, rType)
-	default:
-		return errors.New("resource not implemented")
+	err := s.hi.Install(name, rType)
+	if err != nil {
+		return err
 	}
+	return s.r.AddResource(ctx, convertResourceTypeToString(rType), name)
+}
+
+func convertResourceTypeToString(rtype internal.ResourceType) string {
+	switch rtype {
+	case internal.Postgres:
+		return "postgres"
+	case internal.Redis:
+		return "redis"
+	case internal.Prometheus:
+		return "prometheus"
+	case internal.Grafana:
+		return "grafana"
+	default:
+	}
+	return "unknown"
 }
 
 func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceType, name string) error {
@@ -145,6 +172,30 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 
 	adminConf, err := s.r.GetAdminConf(ctx, clusterId)
 	return &models.AdminConfig{Config: adminConf}, err
+}
+
+func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error) {
+	resources, err := s.hi.GetResourcesList()
+
+	if err != nil {
+		return nil, err
+	}
+
+	resourceList := make([]internal.Resourse, 0, len(resources))
+
+	for _, res := range resources {
+		resourceList = append(resourceList, internal.Resourse{
+			Name:          res.Name,
+			Status:        res.Status,
+			FirstDeployed: res.FirstDeployed,
+			LastDeployed:  res.LastDeployed,
+			AppVersion:    res.AppVersion,
+			Description:   res.Description,
+			ChartVersion:  res.ChartVersion,
+			ApiVersion:    res.ApiVersion,
+		})
+	}
+	return resourceList, nil
 }
 
 func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error) {
