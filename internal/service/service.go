@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
-	"errors"
+	"net/netip"
+	"strconv"
+
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
 	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
-	"net/netip"
-	"strconv"
 
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
 
@@ -204,9 +204,24 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 		return 0, err
 	}
 
-	taskID, err := s.tm.AddTask(s.k8sInstaller.RemoveK8S, node.IP, taskmanager.AuthData{
-		Login:    node.Login,
-		Password: node.Password,
-	})
+	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(ctx, node), node.IP)
 	return int(taskID), err
+}
+
+func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
+	return func(taskID taskmanager.ID) error {
+		sshBuilder := ssh.NewSSHBuilder()
+		cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
+		if err != nil {
+			return err
+		}
+		defer func(cc cconn.ClientConn) {
+			_ = cc.Close()
+		}(cc)
+		err = s.k8sInstaller.RemoveK8S(cc)
+		if err != nil {
+			return err
+		}
+		return s.r.SetNodeClusterID(ctx, node.ID, 0)
+	}
 }
