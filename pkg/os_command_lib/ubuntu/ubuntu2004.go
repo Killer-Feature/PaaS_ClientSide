@@ -177,7 +177,7 @@ func (u *Ubuntu2004CommandLib) KubeadmJoin(ip netip.AddrPort, token, tokenHash s
 
 func (u *Ubuntu2004CommandLib) KubeadmReset() cl.CommandAndParser {
 	cp := cl.CommandAndParser{
-		Command:   "sudo kubeadm reset",
+		Command:   "sudo kubeadm reset -f",
 		Parser:    nil,
 		Condition: cl.Anyway,
 	}
