@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"net/netip"
 	"os"
 	"strconv"
+
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 
 	_ "github.com/mattn/go-sqlite3" // Import go-sqlite3 library
 	"go.uber.org/zap"
@@ -185,17 +186,22 @@ func (r *Repository) SetNodeClusterID(ctx context.Context, id int, clusterID int
 	return nil
 }
 
-func (r *Repository) IsNodeExists(ctx context.Context, ip netip.AddrPort) (bool, error) {
+func (r *Repository) IsNodeExists(ctx context.Context, ip netip.AddrPort) (int, error) {
 	sqlScript := "SELECT id FROM nodes WHERE ip=$1"
 	rows, err := r.db.QueryContext(ctx, sqlScript, ip.String())
+	defer rows.Close()
 	if err != nil {
-		return false, err
+		return 0, err
 	}
-	if !rows.Next() {
-		return false, nil
+
+	var id int
+	for rows.Next() {
+		if err = rows.Scan(&id); err != nil {
+			r.l.Error("error during scanning node id from database", zap.Error(err))
+			return 0, err
+		}
 	}
-	_ = rows.Close()
-	return true, nil
+	return id, nil
 }
 
 func (r *Repository) Close() error {

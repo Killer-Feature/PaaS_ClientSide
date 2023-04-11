@@ -3,21 +3,17 @@ package service
 import (
 	"context"
 	"net/netip"
-	"strconv"
-
-	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
-	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
-	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
-
-	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
-
-	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
-	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
-	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
-	"go.uber.org/zap"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/executor"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
+	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
+	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
+	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
+	"go.uber.org/zap"
 )
 
 type Service struct {
@@ -97,7 +93,7 @@ func (s *Service) AddNode(ctx context.Context, node internal.FullNode) (int, err
 	if err != nil {
 		return 0, err
 	}
-	if exists == false {
+	if exists == 0 {
 		return s.r.AddNode(ctx, node)
 	}
 	return 0, internal.ErrNodeExists
@@ -135,12 +131,20 @@ func (s *Service) RemoveResource(ctx context.Context, rType internal.ResourceTyp
 }
 
 func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.AdminConfig, error) {
-	_, masterIdStr, _, err := s.r.GetClusterTokenIPAndHash(ctx, clusterId)
+	_, masterIpStr, _, err := s.r.GetClusterTokenIPAndHash(ctx, clusterId)
 	if err != nil {
 		return nil, err
 	}
 
-	masterId, err := strconv.Atoi(masterIdStr)
+	ipport, err := netip.ParseAddrPort(masterIpStr)
+	if err != nil {
+		return nil, err
+	}
+
+	masterId, err := s.r.IsNodeExists(ctx, ipport)
+	if err != nil {
+		return nil, err
+	}
 
 	node, err := s.r.GetFullNode(ctx, masterId)
 	if err != nil {

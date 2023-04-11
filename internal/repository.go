@@ -2,8 +2,9 @@ package internal
 
 import (
 	"context"
-	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 	"net/netip"
+
+	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 )
 
 type Repository interface {
@@ -11,7 +12,7 @@ type Repository interface {
 	GetFullNode(ctx context.Context, id int) (FullNode, error)
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
-	IsNodeExists(ctx context.Context, ip netip.AddrPort) (bool, error)
+	IsNodeExists(ctx context.Context, ip netip.AddrPort) (int, error)
 	SetNodeClusterID(ctx context.Context, id int, clusterID int) error
 
 	AddResource(ctx context.Context, rType, name string) error
