@@ -149,6 +149,8 @@ func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
 		if err != nil && command.Condition != cl.Anyway {
 			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
 			return err
+		} else if err != nil {
+			installer.l.Warn("exec failed", zap.String("command", string(command.Command)))
 		}
 
 		if command.Parser != nil {

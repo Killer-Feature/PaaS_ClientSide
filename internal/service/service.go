@@ -66,7 +66,7 @@ func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, err
 		return 0, err
 	}
 
-	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(ctx, node), node.IP)
+	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(context.Background(), node), node.IP)
 	return int(taskID), err
 }
 
@@ -208,7 +208,7 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 		return 0, err
 	}
 
-	taskID, err := s.tm.AddTask(s.removeNodeFromCurrentClusterProgressTask(ctx, node), node.IP)
+	taskID, err := s.tm.AddTask(s.removeNodeFromCurrentClusterProgressTask(context.Background(), node), node.IP)
 	return int(taskID), err
 }
 
