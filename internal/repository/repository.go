@@ -331,6 +331,12 @@ func (r *Repository) GetClusterTokenIPAndHash(ctx context.Context, clusterID int
 	return
 }
 
+func (r *Repository) DeleteClusterTokenIPAndHash(ctx context.Context, clusterID int) (err error) {
+	sqlScript := "DELETE FROM clusters WHERE id = $1"
+	_, err = r.db.ExecContext(ctx, sqlScript, clusterID)
+	return
+}
+
 func (r *Repository) UpdateAdminConf(ctx context.Context, clusterID int, adminConf string) (err error) {
 	sqlScript := "UPDATE clusters SET admin_conf = $1  WHERE id = $2"
 	_, err = r.db.ExecContext(ctx, sqlScript, adminConf, clusterID)

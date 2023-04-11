@@ -226,6 +226,33 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 		if err != nil {
 			return err
 		}
-		return s.r.SetNodeClusterID(ctx, node.ID, 0)
+
+		defer func(r internal.Repository, ctx context.Context, id int, clusterID int) {
+			_ = r.SetNodeClusterID(ctx, id, clusterID)
+		}(s.r, ctx, node.ID, 0)
+
+		_, masterIpStr, _, err := s.r.GetClusterTokenIPAndHash(ctx, 1)
+		if err != nil {
+			return err
+		}
+
+		ipport, err := netip.ParseAddrPort(masterIpStr)
+		if err != nil {
+			return err
+		}
+
+		masterId, err := s.r.IsNodeExists(ctx, ipport)
+		if err != nil {
+			return err
+		}
+
+		if masterId == node.ID {
+			err = s.r.DeleteClusterTokenIPAndHash(ctx, masterId)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 }
