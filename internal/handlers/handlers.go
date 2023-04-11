@@ -204,6 +204,8 @@ func ConvertResourceTypeToString(resource string) internal.ResourceType {
 		return internal.Grafana
 	case "nginx-ingress-controller":
 		return internal.NginxIngressController
+	case "metallb":
+		return internal.MetalLB
 	default:
 	}
 	return internal.Undefined
