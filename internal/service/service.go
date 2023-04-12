@@ -197,6 +197,8 @@ func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error)
 			Description:   res.Description,
 			ChartVersion:  res.ChartVersion,
 			ApiVersion:    res.ApiVersion,
+			Type:          res.Type,
+			ChartURL:      res.ChartURL,
 		})
 	}
 	return resourceList, nil

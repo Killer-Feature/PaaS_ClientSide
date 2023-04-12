@@ -29,10 +29,6 @@ import (
 	"helm.sh/helm/v3/pkg/strvals"
 )
 
-const (
-	dateTimeFormat = "2 January 15:04:05, 2006"
-)
-
 var (
 	prometheusArgs = map[string]string{
 		// comma seperated values to set
@@ -303,6 +299,8 @@ type Resourse struct {
 	ApiVersion    string
 	Description   string
 	ChartVersion  string
+	Type          string
+	ChartURL      string
 }
 
 func (hi *HelmInstaller) GetResourcesList() ([]Resourse, error) {
@@ -314,6 +312,7 @@ func (hi *HelmInstaller) GetResourcesList() ([]Resourse, error) {
 
 	resources, err := client.Run()
 	if err != nil {
+		hi.l.Error("failed listing helm resources", zap.String("err", err.Error()))
 		return nil, err
 	}
 
@@ -322,12 +321,14 @@ func (hi *HelmInstaller) GetResourcesList() ([]Resourse, error) {
 		resourceList = append(resourceList, Resourse{
 			Name:          res.Name,
 			Status:        res.Info.Status.String(),
-			FirstDeployed: res.Info.FirstDeployed.Format(dateTimeFormat),
-			LastDeployed:  res.Info.LastDeployed.Format(dateTimeFormat),
+			FirstDeployed: res.Info.FirstDeployed.String(),
+			LastDeployed:  res.Info.LastDeployed.String(),
 			AppVersion:    res.Chart.Metadata.AppVersion,
 			Description:   res.Chart.Metadata.Description,
 			ChartVersion:  res.Chart.Metadata.Version,
 			ApiVersion:    res.Chart.Metadata.APIVersion,
+			Type:          res.Chart.Metadata.Name,
+			ChartURL:      res.Chart.Metadata.Home,
 		})
 	}
 
