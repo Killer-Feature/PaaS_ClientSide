@@ -6,8 +6,10 @@ import (
 	"net/netip"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	cl "github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
@@ -15,14 +17,16 @@ import (
 )
 
 type Installer struct {
-	r internal.Repository
-	l *zap.Logger
+	r  internal.Repository
+	l  *zap.Logger
+	hi *helm.HelmInstaller
 }
 
-func NewInstaller(l *zap.Logger, r internal.Repository) *Installer {
+func NewInstaller(l *zap.Logger, r internal.Repository, hi *helm.HelmInstaller) *Installer {
 	return &Installer{
-		r: r,
-		l: l,
+		r:  r,
+		l:  l,
+		hi: hi,
 	}
 }
 
@@ -56,6 +60,18 @@ func (installer *Installer) kubeadmInit() []cl.CommandAndParser {
 		commandLib.AddKubeConfig(),
 		commandLib.UntaintControlPlane(),
 		commandLib.AddFlannel(),
+	}
+	return commands
+}
+
+func (installer *Installer) kubeadmCreateGrafana() []cl.CommandAndParser {
+	commandLib := ubuntu.Ubuntu2004CommandLib{}
+
+	commands := []cl.CommandAndParser{
+		commandLib.AddStorageClass(),
+		commandLib.AddGrafanaPV(),
+		commandLib.AddPostgresPV(),
+		commandLib.AddGrafanaIngress(),
 	}
 	return commands
 }
@@ -134,9 +150,69 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn) error {
 			if err != nil {
 				return err
 			}
-
 		}
 	}
+
+	time.Sleep(30 * time.Second)
+
+	err = installer.hi.InstallChart("metallb", "metallb", "metallb", nil)
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(30 * time.Second)
+
+	commandLib := ubuntu.Ubuntu2004CommandLib{}
+	command := commandLib.AddMetallbConf()
+
+	exec, err := conn.Exec(string(command.Command))
+	installer.l.Info("metallb installed")
+	if err != nil && command.Condition != cl.Anyway {
+		installer.l.Error("exec failed", zap.String("command", string(command.Command)))
+		return err
+	}
+
+	if command.Parser != nil {
+		err = command.Parser(exec, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	time.Sleep(5 * time.Second)
+
+	err = installer.hi.InstallChart("nginx-ingress-controller", "bitnami", "nginx-ingress-controller", nil)
+	if err != nil {
+		return err
+	}
+	err = installer.hi.InstallChart("prometheus", "bitnami", "prometheus", nil)
+	if err != nil {
+		return err
+	}
+	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", nil)
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(30 * time.Second)
+
+	grafanaCommands := installer.kubeadmCreateGrafana()
+	for i, command := range grafanaCommands {
+		exec, err := conn.Exec(string(command.Command))
+		installer.l.Info("grafana installation percent", zap.Int("percent", (i+1)*100/len(kubeadmInstallCommands)))
+		if err != nil && command.Condition != cl.Anyway {
+			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
+			return err
+		}
+
+		if command.Parser != nil {
+			err = command.Parser(exec, nil)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

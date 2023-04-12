@@ -164,6 +164,48 @@ func (u *Ubuntu2004CommandLib) AddFlannel() cl.CommandAndParser {
 	}
 }
 
+func (u *Ubuntu2004CommandLib) AddStorageClass() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "kubectl apply -f ./storage.yaml",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (u *Ubuntu2004CommandLib) AddMetallbConf() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "kubectl apply -f ./metallb.yaml",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (u *Ubuntu2004CommandLib) AddPostgresPV() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "kubectl apply -f ./pv.yaml",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (u *Ubuntu2004CommandLib) AddGrafanaPV() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "kubectl apply -f ./pv_grafana.yaml",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (u *Ubuntu2004CommandLib) AddGrafanaIngress() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "kubectl apply -f ./ingress.yaml",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+// Join cluster
+
 func (u *Ubuntu2004CommandLib) KubeadmJoin(ip netip.AddrPort, token, tokenHash string) cl.CommandAndParser {
 
 	cp := cl.CommandAndParser{
@@ -174,6 +216,8 @@ func (u *Ubuntu2004CommandLib) KubeadmJoin(ip netip.AddrPort, token, tokenHash s
 	cp = cp.WithArgs(ip.String(), "--token", token, "--discovery-token-ca-cert-hash", tokenHash)
 	return cp
 }
+
+// Reset Kubeadm
 
 func (u *Ubuntu2004CommandLib) KubeadmReset() cl.CommandAndParser {
 	cp := cl.CommandAndParser{

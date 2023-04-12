@@ -216,7 +216,7 @@ func (h *Handler) GetAdminConfig(ctx echo.Context) error {
 	clusterId, err := strconv.Atoi(clusterIdStr)
 	if err != nil || clusterId <= 0 {
 		clusterId = 1
-		//return ctx.HTML(http.StatusBadRequest, err.Error())
+
 	}
 	conf, err := h.u.GetAdminConfig(ctx.Request().Context(), clusterId)
 	if err != nil {

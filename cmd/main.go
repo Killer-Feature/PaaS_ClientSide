@@ -50,11 +50,11 @@ func main() {
 		logger.Fatal("database creating error", zap.Error(err))
 	}
 	tm := taskmanager.NewTaskManager[netip.AddrPort](ctx, servLogger)
-	k8sinstaller := k8s_installer.NewInstaller(logger, r)
 	hi, err := helm.NewHelmInstaller("default", "https://charts.bitnami.com/bitnami", "bitnami", logger)
 	if err != nil {
 		logger.Fatal("helm installer creating error", zap.Error(err))
 	}
+	k8sinstaller := k8s_installer.NewInstaller(logger, r, hi)
 	u := service.NewService(r, logger, tm, k8sinstaller, hi)
 	h := handlers.NewHandler(logger, u)
 	h.Register(server)
