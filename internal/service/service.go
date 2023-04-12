@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/netip"
+	"os"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -84,6 +85,15 @@ func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node 
 		if err != nil {
 			return err
 		}
+
+		// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
+		config, err := s.getAdminConf(ctx, cc)
+		if err == nil {
+			err = os.WriteFile("./config", config, 0666)
+			if err != nil {
+				s.l.Error("error writing admin.conf to ./config", zap.String("error", err.Error()))
+			}
+		}
 		return s.r.SetNodeClusterID(ctx, node.ID, 1)
 	}
 }
@@ -162,11 +172,7 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 		_ = cc.Close()
 	}(cc)
 
-	cl := ubuntu.Ubuntu2004CommandLib{}
-
-	getAdminConfCommand := cl.CatAdminConfFile()
-
-	output, err := cc.Exec(string(getAdminConfCommand.Command))
+	output, err := s.getAdminConf(ctx, cc)
 
 	if err == nil {
 		adminConf := string(output)
@@ -176,6 +182,17 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 
 	adminConf, err := s.r.GetAdminConf(ctx, clusterId)
 	return &models.AdminConfig{Config: adminConf}, err
+}
+
+func (s *Service) getAdminConf(ctx context.Context, cc cconn.ClientConn) ([]byte, error) {
+	cl := ubuntu.Ubuntu2004CommandLib{}
+	getAdminConfCommand := cl.CatAdminConfFile()
+	output, err := cc.Exec(string(getAdminConfCommand.Command))
+	if err != nil {
+		s.l.Error("error getting admin.conf", zap.String("error", err.Error()))
+		return nil, err
+	}
+	return output, nil
 }
 
 func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error) {
