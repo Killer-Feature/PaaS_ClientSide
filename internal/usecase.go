@@ -44,6 +44,8 @@ type Resourse struct {
 	ApiVersion    string `json:"apiVersion"`
 	Description   string `json:"description"`
 	ChartVersion  string `json:"chartVersion"`
+	Type          string `json:"type"`
+	ChartURL      string `json:"chartURL"`
 }
 
 const (
