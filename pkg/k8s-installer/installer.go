@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -153,6 +154,16 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn) error {
 		}
 	}
 
+	// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
+	config, err := installer.getAdminConf(context.Background(), conn)
+	if err == nil {
+		err = os.WriteFile("./config", config, 0666)
+		if err != nil {
+			installer.l.Error("error writing admin.conf to ./config", zap.String("error", err.Error()))
+			return err
+		}
+	}
+
 	time.Sleep(30 * time.Second)
 
 	err = installer.hi.InstallChart("metallb", "metallb", "metallb", nil)
@@ -237,4 +248,15 @@ func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
 		}
 	}
 	return nil
+}
+
+func (s *Installer) getAdminConf(ctx context.Context, cc client_conn.ClientConn) ([]byte, error) {
+	cl := ubuntu.Ubuntu2004CommandLib{}
+	getAdminConfCommand := cl.CatAdminConfFile()
+	output, err := cc.Exec(string(getAdminConfCommand.Command))
+	if err != nil {
+		s.l.Error("error getting admin.conf", zap.String("error", err.Error()))
+		return nil, err
+	}
+	return output, nil
 }

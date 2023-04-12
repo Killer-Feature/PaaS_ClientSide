@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"net/netip"
-	"os"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -86,14 +85,6 @@ func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node 
 			return err
 		}
 
-		// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
-		config, err := s.getAdminConf(ctx, cc)
-		if err == nil {
-			err = os.WriteFile("./config", config, 0666)
-			if err != nil {
-				s.l.Error("error writing admin.conf to ./config", zap.String("error", err.Error()))
-			}
-		}
 		return s.r.SetNodeClusterID(ctx, node.ID, 1)
 	}
 }
