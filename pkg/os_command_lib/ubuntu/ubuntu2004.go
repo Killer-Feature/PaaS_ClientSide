@@ -174,7 +174,7 @@ func (u *Ubuntu2004CommandLib) AddStorageClass() cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) AddMetallbConf() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "kubectl apply -f ./metallb.yaml",
+		Command:   "kubectl apply -f /home/ubuntu/metallb.yaml",
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -182,7 +182,7 @@ func (u *Ubuntu2004CommandLib) AddMetallbConf() cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) AddPostgresPV() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "kubectl apply -f ./pv.yaml",
+		Command:   "kubectl apply -f /home/ubuntu/pv.yaml",
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -190,7 +190,7 @@ func (u *Ubuntu2004CommandLib) AddPostgresPV() cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) AddGrafanaPV() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "kubectl apply -f ./pv_grafana.yaml",
+		Command:   "kubectl apply -f /home/ubuntu/pv_grafana.yaml",
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -198,7 +198,7 @@ func (u *Ubuntu2004CommandLib) AddGrafanaPV() cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) AddGrafanaIngress() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "kubectl apply -f ./ingress.yaml",
+		Command:   "kubectl apply -f /home/ubuntu/ingress.yaml",
 		Parser:    nil,
 		Condition: cl.Required,
 	}
