@@ -166,7 +166,7 @@ func (u *Ubuntu2004CommandLib) AddFlannel() cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) AddStorageClass() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "kubectl apply -f ./storage.yaml",
+		Command:   "kubectl apply -f /home/ubuntu/storage.yaml",
 		Parser:    nil,
 		Condition: cl.Required,
 	}
