@@ -118,7 +118,7 @@ func (installer *Installer) parseKubeadmInit(output []byte, extraData interface{
 	return installer.r.AddClusterTokenIPAndHash(context.Background(), 1, matchMap["token"], matchMap["hostport"], matchMap["hash"])
 }
 
-func (installer *Installer) InstallK8S(conn client_conn.ClientConn) error {
+func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) error {
 	kubeadmInstallCommands := installer.installKubeadm()
 
 	isClusterExists, err := installer.r.CheckClusterTokenIPAndHash(context.Background(), 1)
@@ -152,6 +152,11 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn) error {
 				return err
 			}
 		}
+	}
+
+	err = installer.r.SetNodeClusterID(context.Background(), nodeid, 1)
+	if err != nil {
+		return err
 	}
 
 	// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
@@ -196,7 +201,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn) error {
 	if err != nil {
 		return err
 	}
-	err = installer.hi.InstallChart("prometheus", "bitnami", "prometheus", nil)
+	err = installer.hi.InstallChart("prometheus", "bitnami", "kube-prometheus", nil)
 	if err != nil {
 		return err
 	}
