@@ -201,14 +201,6 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 	if err != nil {
 		return err
 	}
-	err = installer.hi.InstallChart("prometheus", "bitnami", "kube-prometheus", nil)
-	if err != nil {
-		return err
-	}
-	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", nil)
-	if err != nil {
-		return err
-	}
 
 	time.Sleep(30 * time.Second)
 
@@ -228,6 +220,19 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 			}
 		}
 	}
+
+	time.Sleep(10 * time.Second)
+
+	err = installer.hi.InstallChart("prometheus", "bitnami", "kube-prometheus", nil)
+	if err != nil {
+		return err
+	}
+	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", nil)
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(60 * time.Second)
 
 	return nil
 }
