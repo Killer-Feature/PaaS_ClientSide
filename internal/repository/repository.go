@@ -58,7 +58,8 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 	createNodesTableSQL := `CREATE TABLE IF NOT EXISTS nodes (
 		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
 		"name" TEXT,
-		"ip" TEXT,	
+		"ip_port" TEXT,
+		"ip" TEXT,
 		"login" TEXT,
 		"cluster_id" integer,
 		"password" TEXT,
@@ -103,7 +104,7 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 }
 
 func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) {
-	sqlScript := "SELECT id, name, ip, login, password, cluster_id, is_master FROM nodes;"
+	sqlScript := "SELECT id, name, ip_port, login, password, cluster_id, is_master FROM nodes;"
 
 	rows, err := r.db.QueryContext(ctx, sqlScript)
 	if err != nil {
@@ -135,7 +136,7 @@ func (r *Repository) GetNodes(ctx context.Context) ([]internal.FullNode, error) 
 }
 
 func (r *Repository) GetFullNode(ctx context.Context, id int) (internal.FullNode, error) {
-	sqlScript := "SELECT id, name, ip, login, password, cluster_id, is_master FROM nodes WHERE id = $1"
+	sqlScript := "SELECT id, name, ip_port, login, password, cluster_id, is_master FROM nodes WHERE id = $1"
 
 	var singleNode internal.FullNode
 	var ip string
@@ -162,8 +163,8 @@ type Repository struct {
 }
 
 func (r *Repository) AddNode(ctx context.Context, node internal.FullNode) (int, error) {
-	sqlScript := "INSERT INTO nodes(name, ip, login, password) VALUES ($1, $2, $3, $4) RETURNING id;"
-	err := r.db.QueryRowContext(ctx, sqlScript, node.Name, node.IP.String(), node.Login, node.Password).Scan(&node.ID)
+	sqlScript := "INSERT INTO nodes(name, ip_port, login, password, ip) VALUES ($1, $2, $3, $4, $5) RETURNING id;"
+	err := r.db.QueryRowContext(ctx, sqlScript, node.Name, node.IP.String(), node.Login, node.Password, node.IP.Addr().String()).Scan(&node.ID)
 	if err != nil {
 		r.l.Error("error during adding node to database", zap.Error(err))
 		return 0, err
@@ -186,13 +187,14 @@ func (r *Repository) SetNodeClusterID(ctx context.Context, id int, clusterID int
 	return nil
 }
 
-func (r *Repository) IsNodeExists(ctx context.Context, ip netip.AddrPort) (int, error) {
-	sqlScript := "SELECT id FROM nodes WHERE ip=$1"
+func (r *Repository) IsNodeExists(ctx context.Context, ip netip.Addr) (int, error) {
+	sqlScript := "SELECT id FROM nodes WHERE ip_port=$1"
 	rows, err := r.db.QueryContext(ctx, sqlScript, ip.String())
-	defer rows.Close()
 	if err != nil {
 		return 0, err
 	}
+
+	defer rows.Close()
 
 	var id int
 	for rows.Next() {

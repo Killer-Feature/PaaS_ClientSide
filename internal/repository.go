@@ -12,7 +12,7 @@ type Repository interface {
 	GetFullNode(ctx context.Context, id int) (FullNode, error)
 	AddNode(ctx context.Context, node FullNode) (int, error)
 	RemoveNode(ctx context.Context, id int) error
-	IsNodeExists(ctx context.Context, ip netip.AddrPort) (int, error)
+	IsNodeExists(ctx context.Context, ip netip.Addr) (int, error)
 	SetNodeClusterID(ctx context.Context, id int, clusterID int) error
 
 	AddResource(ctx context.Context, rType, name string) error

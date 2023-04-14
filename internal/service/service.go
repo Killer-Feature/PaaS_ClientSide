@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"net/netip"
-	"os"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -11,28 +10,35 @@ import (
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/socketmanager"
 	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
+
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
 )
 
 type Service struct {
-	r  internal.Repository
-	l  *zap.Logger
-	tm *taskmanager.Manager[netip.AddrPort]
-	hi *helm.HelmInstaller
+	r          internal.Repository
+	l          *zap.Logger
+	tm         *taskmanager.Manager[netip.AddrPort]
+	sm         *socketmanager.SocketManager[internal.Message]
+	hi         *helm.HelmInstaller
+	progressCh chan internal.Message
 
 	k8sInstaller *k8s_installer.Installer
 }
 
 func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager[netip.AddrPort], k8sInstaller *k8s_installer.Installer, hi *helm.HelmInstaller) internal.Usecase {
+	progressCh := make(chan internal.Message)
 	return &Service{
 		r:            r,
 		l:            l,
 		tm:           tm,
+		sm:           socketmanager.NewSocketManager[internal.Message](progressCh, nil, l),
 		k8sInstaller: k8sInstaller,
 		hi:           hi,
+		progressCh:   progressCh,
 	}
 }
 
@@ -73,33 +79,29 @@ func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, err
 
 func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
 	return func(taskID taskmanager.ID) error {
+		sendProgress := func(percent int, status internal.TaskStatus, log string, err string) {
+			s.progressCh <- internal.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+		}
+		sendProgress(1, internal.STATUS_START, "", "")
 		sshBuilder := ssh.NewSSHBuilder()
 		cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
 		if err != nil {
+			sendProgress(1, internal.STATUS_ERROR, "", err.Error())
 			return err
 		}
+		sendProgress(1, internal.STATUS_IN_PROCESS, "", "")
 		defer func(cc cconn.ClientConn) {
 			_ = cc.Close()
 		}(cc)
-		err = s.k8sInstaller.InstallK8S(cc)
-		if err != nil {
-			return err
-		}
 
-		// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
-		config, err := s.getAdminConf(ctx, cc)
-		if err == nil {
-			err = os.WriteFile("./config", config, 0666)
-			if err != nil {
-				s.l.Error("error writing admin.conf to ./config", zap.String("error", err.Error()))
-			}
-		}
-		return s.r.SetNodeClusterID(ctx, node.ID, 1)
+		err = s.k8sInstaller.InstallK8S(cc, node.ID, sendProgress)
+
+		return err
 	}
 }
 
 func (s *Service) AddNode(ctx context.Context, node internal.FullNode) (int, error) {
-	exists, err := s.r.IsNodeExists(ctx, node.IP)
+	exists, err := s.r.IsNodeExists(ctx, node.IP.Addr())
 	if err != nil {
 		return 0, err
 	}
@@ -128,7 +130,7 @@ func convertResourceTypeToString(rtype internal.ResourceType) string {
 	case internal.Redis:
 		return "redis"
 	case internal.Prometheus:
-		return "prometheus"
+		return "kube-prometheus"
 	case internal.Grafana:
 		return "grafana"
 	default:
@@ -151,7 +153,7 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 		return nil, err
 	}
 
-	masterId, err := s.r.IsNodeExists(ctx, ipport)
+	masterId, err := s.r.IsNodeExists(ctx, ipport.Addr())
 	if err != nil {
 		return nil, err
 	}
@@ -260,12 +262,13 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 			return err
 		}
 
-		masterId, err := s.r.IsNodeExists(ctx, ipport)
+		masterId, err := s.r.IsNodeExists(ctx, ipport.Addr())
 		if err != nil {
 			return err
 		}
 
 		if masterId == node.ID {
+			s.l.Info("Removing cluster token and hash from DB")
 			err = s.r.DeleteClusterTokenIPAndHash(ctx, masterId)
 			if err != nil {
 				return err
@@ -274,4 +277,9 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 
 		return nil
 	}
+}
+
+func (s *Service) GetProgress(ctx context.Context, socket socketmanager.Socket) error {
+	s.sm.SetSocket(socket)
+	return nil
 }

@@ -2,21 +2,31 @@ package handlers
 
 import (
 	"embed"
+	"github.com/gorilla/websocket"
+	echo "github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 	"io/fs"
 	"log"
 	"net/http"
 	"net/netip"
 	"strconv"
 
-	echo "github.com/labstack/echo/v4"
-	"go.uber.org/zap"
-
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 )
 
 const (
+	READ_BUFSIZE          = 1024
+	WRITE_BUFSIZE         = 1024
 	CLUSTER_ID_PARAM_NAME = "clusterId"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  READ_BUFSIZE,
+	WriteBufferSize: WRITE_BUFSIZE,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 type Handler struct {
 	logger *zap.Logger
@@ -49,6 +59,8 @@ func (h *Handler) Register(s *echo.Echo) {
 
 	s.GET("/api/getAdminConfig", h.GetAdminConfig)
 	s.GET("/api/getResources", h.GetResources)
+
+	s.GET("/api/getProgress", h.GetProgress)
 
 	fsys, err := fs.Sub(ui, "dist")
 	if err != nil {
@@ -216,7 +228,7 @@ func (h *Handler) GetAdminConfig(ctx echo.Context) error {
 	clusterId, err := strconv.Atoi(clusterIdStr)
 	if err != nil || clusterId <= 0 {
 		clusterId = 1
-		//return ctx.HTML(http.StatusBadRequest, err.Error())
+
 	}
 	conf, err := h.u.GetAdminConfig(ctx.Request().Context(), clusterId)
 	if err != nil {
@@ -234,4 +246,20 @@ func (h *Handler) GetResources(ctx echo.Context) error {
 		return ctx.NoContent(http.StatusOK)
 	}
 	return ctx.JSON(http.StatusOK, resources)
+}
+
+func (h *Handler) GetProgress(ctx echo.Context) error {
+	ws, err := upgrader.Upgrade(ctx.Response(), ctx.Request(), nil)
+	if err != nil {
+		h.logger.Error("get progress request error", zap.String("error", err.Error()))
+		return nil
+	}
+	//defer func(ws *websocket.Conn) {
+	//	err := ws.Close()
+	//	if err != nil {
+	//		h.logger.Error("getProgress request error", zap.String("error", err.Error()))
+	//	}
+	//}(ws)
+	_ = h.u.GetProgress(ctx.Request().Context(), ws)
+	return nil
 }
