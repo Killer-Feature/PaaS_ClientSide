@@ -134,6 +134,12 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 	}
 
 	commandNumber := 16
+	percent, k := 1, 1
+	percentNext := func() int {
+		percent = (k*100 - 1) / commandNumber
+		k++
+		return percent
+	}
 
 	if isClusterExists {
 		token, ip, hash, err := installer.r.GetClusterTokenIPAndHash(context.Background(), 1)
@@ -146,13 +152,6 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 		installer.l.Info("Adding new control plane to cluster")
 		kubeadmInstallCommands = append(kubeadmInstallCommands, installer.kubeadmInit()...)
 		commandNumber = 32
-	}
-
-	percent, k := 1, 1
-	percentNext := func() int {
-		percent = (k*100 - 1) / commandNumber
-		k++
-		return percent
 	}
 
 	log := make([]byte, 0, LOG_INITIAL_SIZE)
@@ -208,6 +207,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 	time.Sleep(30 * time.Second)
 	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 
+	installer.hi.SetNewConfig()
 	err = installer.hi.InstallChart("metallb", "metallb", "metallb", nil)
 	if err != nil {
 		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
@@ -291,13 +291,24 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 	return nil
 }
 
-func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
+func (installer *Installer) RemoveK8S(conn client_conn.ClientConn, sendProgress func(percent int, status internal.TaskStatus, log string, err string)) error {
 	kubeadmStopCommands := installer.kubeadmReset()
+
+	percent, k := 1, 1
+	percentNext := func() int {
+		percent = (k*100 - 1) / 8
+		k++
+		return percent
+	}
+
+	log := make([]byte, 0, LOG_INITIAL_SIZE)
 
 	for i, command := range kubeadmStopCommands {
 		exec, err := conn.Exec(string(command.Command))
+		log = pushToLog(log, []byte(command.Command), exec)
 		installer.l.Info("installation percent", zap.Int("percent", (i+1)*100/len(kubeadmStopCommands)))
 		if err != nil && command.Condition != cl.Anyway {
+			sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
 			return err
 		} else if err != nil {
@@ -307,10 +318,13 @@ func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
 		if command.Parser != nil {
 			err = command.Parser(exec, nil)
 			if err != nil {
+				sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 				return err
 			}
 		}
+		sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	}
+	sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
 	return nil
 }
 

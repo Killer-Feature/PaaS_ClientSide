@@ -79,10 +79,19 @@ type AddNodeToClusterProgressMsg struct {
 	NodeID  int        `json:"nodeID"`
 }
 
+type RemoveNodeFromClusterMsg struct {
+	Log     string     `json:"log"`
+	Percent int        `json:"percent"`
+	Error   string     `json:"error"`
+	Status  TaskStatus `json:"status"`
+	NodeID  int        `json:"nodeID"`
+}
+
 type MessageType string
 
 const (
-	AddNodeToClusterT MessageType = "addNodeToCluster"
+	AddNodeToClusterT      MessageType = "addNodeToCluster"
+	RemoveNodeFromClusterT MessageType = "removeNodeFromCluster"
 )
 
 type Message struct {

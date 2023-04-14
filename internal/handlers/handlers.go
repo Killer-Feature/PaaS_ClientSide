@@ -254,12 +254,7 @@ func (h *Handler) GetProgress(ctx echo.Context) error {
 		h.logger.Error("get progress request error", zap.String("error", err.Error()))
 		return nil
 	}
-	//defer func(ws *websocket.Conn) {
-	//	err := ws.Close()
-	//	if err != nil {
-	//		h.logger.Error("getProgress request error", zap.String("error", err.Error()))
-	//	}
-	//}(ws)
+
 	_ = h.u.GetProgress(ctx.Request().Context(), ws)
 	return nil
 }

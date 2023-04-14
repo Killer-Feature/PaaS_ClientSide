@@ -71,6 +71,10 @@ func NewHelmInstaller(namespace, repoUrl, repoName string, logger *zap.Logger) (
 	return hi, nil
 }
 
+func (hi *HelmInstaller) SetNewConfig() {
+	hi.config = kube.GetConfig("./config", "", hi.namespace)
+}
+
 func (hi *HelmInstaller) Install(releaseName string, rType internal.ResourceType) error {
 	// Install charts
 	switch rType {

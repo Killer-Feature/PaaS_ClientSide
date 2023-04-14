@@ -14,6 +14,7 @@ type Repository interface {
 	RemoveNode(ctx context.Context, id int) error
 	IsNodeExists(ctx context.Context, ip netip.Addr) (int, error)
 	SetNodeClusterID(ctx context.Context, id int, clusterID int) error
+	ResetNodeCluster(ctx context.Context, id int) error
 
 	AddResource(ctx context.Context, rType, name string) error
 	GetResources(ctx context.Context) ([]models.ResourceData, error)

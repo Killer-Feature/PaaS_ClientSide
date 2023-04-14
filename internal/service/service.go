@@ -74,6 +74,11 @@ func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, err
 	}
 
 	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(context.Background(), node), node.IP)
+
+	if err == nil {
+		s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
+	}
+
 	return int(taskID), err
 }
 
@@ -230,11 +235,19 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 	}
 
 	taskID, err := s.tm.AddTask(s.removeNodeFromCurrentClusterProgressTask(context.Background(), node), node.IP)
+	if err == nil {
+		s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
+	}
 	return int(taskID), err
 }
 
 func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
 	return func(taskID taskmanager.ID) error {
+		sendProgress := func(percent int, status internal.TaskStatus, log string, err string) {
+			s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+		}
+
+		sendProgress(1, internal.STATUS_START, "", "")
 		sshBuilder := ssh.NewSSHBuilder()
 		cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
 		if err != nil {
@@ -243,14 +256,14 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 		defer func(cc cconn.ClientConn) {
 			_ = cc.Close()
 		}(cc)
-		err = s.k8sInstaller.RemoveK8S(cc)
+		err = s.k8sInstaller.RemoveK8S(cc, sendProgress)
 		if err != nil {
 			return err
 		}
 
-		defer func(r internal.Repository, ctx context.Context, id int, clusterID int) {
-			_ = r.SetNodeClusterID(ctx, id, clusterID)
-		}(s.r, ctx, node.ID, 0)
+		defer func(r internal.Repository, ctx context.Context, id int) {
+			_ = r.ResetNodeCluster(ctx, id)
+		}(s.r, ctx, node.ID)
 
 		_, masterIpStr, _, err := s.r.GetClusterTokenIPAndHash(ctx, 1)
 		if err != nil {
