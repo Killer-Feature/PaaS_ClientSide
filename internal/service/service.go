@@ -257,6 +257,7 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 		}
 
 		if masterId == node.ID {
+			s.l.Info("Removing cluster token and hash from DB")
 			err = s.r.DeleteClusterTokenIPAndHash(ctx, masterId)
 			if err != nil {
 				return err
