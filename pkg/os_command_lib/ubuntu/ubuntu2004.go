@@ -164,6 +164,14 @@ func (u *Ubuntu2004CommandLib) AddFlannel() cl.CommandAndParser {
 	}
 }
 
+func (u *Ubuntu2004CommandLib) CreateFolderForPV() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "sudo mkdir -p /devkube/postgres",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
 func (u *Ubuntu2004CommandLib) AddStorageClass() cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "kubectl apply -f /home/ubuntu/storage.yaml",

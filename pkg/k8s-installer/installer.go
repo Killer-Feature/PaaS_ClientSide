@@ -73,6 +73,7 @@ func (installer *Installer) kubeadmCreateGrafana() []cl.CommandAndParser {
 		commandLib.AddGrafanaPV(),
 		commandLib.AddPostgresPV(),
 		commandLib.AddGrafanaIngress(),
+		commandLib.CreateFolderForPV(),
 	}
 	return commands
 }
@@ -225,7 +226,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 		}
 	}
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Minute)
 
 	err = installer.hi.InstallChart("prometheus", "bitnami", "kube-prometheus", nil)
 	if err != nil {
@@ -235,8 +236,6 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 	if err != nil {
 		return err
 	}
-
-	time.Sleep(60 * time.Second)
 
 	return nil
 }
