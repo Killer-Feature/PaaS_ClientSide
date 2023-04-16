@@ -79,7 +79,7 @@ func (hi *HelmInstaller) Install(releaseName string, rType internal.ResourceType
 	case internal.Redis:
 		return hi.InstallChart(releaseName, hi.repoName, "redis", nil)
 	case internal.Prometheus:
-		return hi.InstallChart(releaseName, hi.repoName, "prometheus", nil)
+		return hi.InstallChart(releaseName, hi.repoName, "kube-prometheus", nil)
 	case internal.Grafana:
 		return hi.InstallChart(releaseName, hi.repoName, "grafana", nil)
 	case internal.NginxIngressController:
