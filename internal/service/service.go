@@ -119,7 +119,7 @@ func convertResourceTypeToString(rtype internal.ResourceType) string {
 	case internal.Redis:
 		return "redis"
 	case internal.Prometheus:
-		return "prometheus"
+		return "kube-prometheus"
 	case internal.Grafana:
 		return "grafana"
 	default:
