@@ -163,7 +163,7 @@ type Repository struct {
 
 func (r *Repository) AddNode(ctx context.Context, node internal.FullNode) (int, error) {
 	sqlScript := "INSERT INTO nodes(name, ip, login, password) VALUES ($1, $2, $3, $4) RETURNING id;"
-	err := r.db.QueryRowContext(ctx, sqlScript, node.Name, node.IP.String(), node.Login, node.Password).Scan(&node.ID)
+	err := r.db.QueryRowContext(ctx, sqlScript, node.Name, node.IP.Addr().String(), node.Login, node.Password).Scan(&node.ID)
 	if err != nil {
 		r.l.Error("error during adding node to database", zap.Error(err))
 		return 0, err

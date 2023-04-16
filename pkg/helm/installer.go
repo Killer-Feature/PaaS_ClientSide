@@ -257,11 +257,11 @@ func (hi *HelmInstaller) InstallChart(name, repo, chart string, args map[string]
 	}
 
 	client.Namespace = hi.settings.Namespace()
-	release, err := client.Run(chartRequested, vals)
+	_, err = client.Run(chartRequested, vals)
 	if err != nil {
 		return err
 	}
-	fmt.Println(release.Manifest)
+	//fmt.Println(release.Manifest)
 	return nil
 }
 
@@ -285,8 +285,8 @@ func (hi *HelmInstaller) UninstallChart(name string) error {
 	}
 	client := action.NewUninstall(actionConfig)
 
-	resp, err := client.Run(name)
-	fmt.Println(resp)
+	_, err := client.Run(name)
+	//fmt.Println(resp)
 	return err
 }
 
