@@ -159,10 +159,14 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 		return err
 	}
 
+	if isClusterExists {
+		return nil
+	}
+
 	// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
 	config, err := installer.getAdminConf(context.Background(), conn)
 	if err == nil {
-		err = os.WriteFile("./config", config, 0666)
+		err = os.WriteFile("./config", config, 0664)
 		if err != nil {
 			installer.l.Error("error writing admin.conf to ./config", zap.String("error", err.Error()))
 			return err
