@@ -90,7 +90,7 @@ func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node 
 }
 
 func (s *Service) AddNode(ctx context.Context, node internal.FullNode) (int, error) {
-	exists, err := s.r.IsNodeExists(ctx, node.IP)
+	exists, err := s.r.IsNodeExists(ctx, node.IP.Addr())
 	if err != nil {
 		return 0, err
 	}
@@ -142,7 +142,7 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 		return nil, err
 	}
 
-	masterId, err := s.r.IsNodeExists(ctx, ipport)
+	masterId, err := s.r.IsNodeExists(ctx, ipport.Addr())
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 			return err
 		}
 
-		masterId, err := s.r.IsNodeExists(ctx, ipport)
+		masterId, err := s.r.IsNodeExists(ctx, ipport.Addr())
 		if err != nil {
 			return err
 		}
