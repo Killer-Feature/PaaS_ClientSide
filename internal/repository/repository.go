@@ -188,7 +188,7 @@ func (r *Repository) SetNodeClusterID(ctx context.Context, id int, clusterID int
 }
 
 func (r *Repository) IsNodeExists(ctx context.Context, ip netip.Addr) (int, error) {
-	sqlScript := "SELECT id FROM nodes WHERE ip_port=$1"
+	sqlScript := "SELECT id FROM nodes WHERE ip=$1"
 	rows, err := r.db.QueryContext(ctx, sqlScript, ip.String())
 	defer rows.Close()
 	if err != nil {
