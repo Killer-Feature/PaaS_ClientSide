@@ -28,6 +28,7 @@ var (
 type Node struct {
 	ID        int            `json:"id"`
 	IP        netip.AddrPort `json:"ip"`
+	GrafanaIP string         `json:"grafana_ip"`
 	Name      string         `json:"name"`
 	ClusterID int            `json:"clusterID"`
 	IsMaster  bool           `json:"isMaster"`

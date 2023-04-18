@@ -61,6 +61,9 @@ func (installer *Installer) kubeadmInit() []cl.CommandAndParser {
 		commandLib.AddKubeConfig(),
 		commandLib.UntaintControlPlane(),
 		commandLib.AddFlannel(),
+		commandLib.InstallHelm(),
+		commandLib.AddBitnamiRepo(),
+		commandLib.InstallPrometheus(),
 	}
 	return commands
 }
@@ -212,7 +215,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 	grafanaCommands := installer.kubeadmCreateGrafana()
 	for i, command := range grafanaCommands {
 		exec, err := conn.Exec(string(command.Command))
-		installer.l.Info("grafana installation percent", zap.Int("percent", (i+1)*100/len(kubeadmInstallCommands)))
+		installer.l.Info("grafana installation percent", zap.Int("percent", (i+1)*100/len(grafanaCommands)))
 		if err != nil && command.Condition != cl.Anyway {
 			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
 			return err
@@ -228,10 +231,6 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 
 	time.Sleep(1 * time.Minute)
 
-	err = installer.hi.InstallChart("prometheus", "bitnami", "kube-prometheus", nil)
-	if err != nil {
-		return err
-	}
 	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", nil)
 	if err != nil {
 		return err
@@ -263,12 +262,12 @@ func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
 	return nil
 }
 
-func (s *Installer) getAdminConf(ctx context.Context, cc client_conn.ClientConn) ([]byte, error) {
+func (installer *Installer) getAdminConf(ctx context.Context, cc client_conn.ClientConn) ([]byte, error) {
 	cl := ubuntu.Ubuntu2004CommandLib{}
 	getAdminConfCommand := cl.CatAdminConfFile()
 	output, err := cc.Exec(string(getAdminConfCommand.Command))
 	if err != nil {
-		s.l.Error("error getting admin.conf", zap.String("error", err.Error()))
+		installer.l.Error("error getting admin.conf", zap.String("error", err.Error()))
 		return nil, err
 	}
 	return output, nil
