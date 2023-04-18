@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/netip"
+	"os"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -172,7 +173,11 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 	cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
 
 	if err != nil {
-		return nil, err
+		configFile, err := os.ReadFile("./config")
+		if err != nil {
+			return nil, err
+		}
+		return &models.AdminConfig{Config: string(configFile)}, nil
 	}
 
 	defer func(cc cconn.ClientConn) {
@@ -181,14 +186,16 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 
 	output, err := s.getAdminConf(ctx, cc)
 
-	if err == nil {
-		adminConf := string(output)
-		_ = s.r.UpdateAdminConf(ctx, clusterId, adminConf)
-		return &models.AdminConfig{Config: adminConf}, nil
+	if err != nil {
+		configFile, err := os.ReadFile("./config")
+		if err != nil {
+			return nil, err
+		}
+		return &models.AdminConfig{Config: string(configFile)}, nil
 	}
 
-	adminConf, err := s.r.GetAdminConf(ctx, clusterId)
-	return &models.AdminConfig{Config: adminConf}, err
+	_ = os.WriteFile("./config", output, 666)
+	return &models.AdminConfig{Config: string(output)}, nil
 }
 
 func (s *Service) getAdminConf(ctx context.Context, cc cconn.ClientConn) ([]byte, error) {

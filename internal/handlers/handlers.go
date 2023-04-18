@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"embed"
+	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/gorilla/websocket"
 	echo "github.com/labstack/echo/v4"
 	"go.uber.org/zap"
@@ -9,9 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/netip"
-	"strconv"
-
-	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 )
 
 const (
@@ -224,13 +222,7 @@ func ConvertResourceTypeToString(resource string) internal.ResourceType {
 }
 
 func (h *Handler) GetAdminConfig(ctx echo.Context) error {
-	clusterIdStr := ctx.QueryParam(CLUSTER_ID_PARAM_NAME)
-	clusterId, err := strconv.Atoi(clusterIdStr)
-	if err != nil || clusterId <= 0 {
-		clusterId = 1
-
-	}
-	conf, err := h.u.GetAdminConfig(ctx.Request().Context(), clusterId)
+	conf, err := h.u.GetAdminConfig(ctx.Request().Context(), 1)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}

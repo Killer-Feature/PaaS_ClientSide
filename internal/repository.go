@@ -26,8 +26,6 @@ type Repository interface {
 	CheckClusterTokenIPAndHash(ctx context.Context, clusterID int) (bool, error)
 	GetClusterTokenIPAndHash(ctx context.Context, clusterID int) (token, masterIP, hash string, err error)
 	DeleteClusterTokenIPAndHash(ctx context.Context, clusterID int) (err error)
-	UpdateAdminConf(ctx context.Context, clusterID int, adminConf string) error
-	GetAdminConf(ctx context.Context, clusterID int) (conf string, err error)
 }
 
 type FullNode struct {

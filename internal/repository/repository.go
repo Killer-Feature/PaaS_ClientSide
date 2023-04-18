@@ -43,7 +43,6 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		"master_ip" TEXT,
 		"token" TEXT,	
 		"hash" TEXT,
-		"admin_conf" TEXT,
 		"master_id" integer
 	  );`
 
@@ -349,29 +348,12 @@ func (r *Repository) GetClusterTokenIPAndHash(ctx context.Context, clusterID int
 }
 
 func (r *Repository) DeleteClusterTokenIPAndHash(ctx context.Context, clusterID int) (err error) {
-	sqlScript := `UPDATE clusters SET token = "", hash = "", master_ip="", master_id=0, admin_conf ="" WHERE id = $1`
+	sqlScript := `UPDATE clusters SET token = "", hash = "", master_ip="", master_id=0 WHERE id = $1`
 	_, err = r.db.ExecContext(ctx, sqlScript, clusterID)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func (r *Repository) UpdateAdminConf(ctx context.Context, clusterID int, adminConf string) (err error) {
-	sqlScript := "UPDATE clusters SET admin_conf = $1  WHERE id = $2"
-	_, err = r.db.ExecContext(ctx, sqlScript, adminConf, clusterID)
-	return err
-}
-
-func (r *Repository) GetAdminConf(ctx context.Context, clusterID int) (conf string, err error) {
-	var rawAdminConf sql.NullString
-	sqlScript := "SELECT admin_confh FROM clusters WHERE id = $1"
-	err = r.db.QueryRowContext(ctx, sqlScript, clusterID).Scan(&rawAdminConf)
-
-	if rawAdminConf.Valid {
-		conf = rawAdminConf.String
-	}
-	return
 }
 
 func (r *Repository) GetResources(ctx context.Context) ([]models.ResourceData, error) {
