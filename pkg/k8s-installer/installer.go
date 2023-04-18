@@ -1,6 +1,7 @@
 package k8s_installer
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/netip"
@@ -15,6 +16,10 @@ import (
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
 	"go.uber.org/zap"
+)
+
+const (
+	LOG_INITIAL_SIZE = 2048
 )
 
 var (
@@ -129,12 +134,21 @@ func (installer *Installer) parseKubeadmInit(output []byte, extraData interface{
 	return installer.r.AddClusterTokenIPAndHash(context.Background(), 1, matchMap["token"], matchMap["hostport"], matchMap["hash"])
 }
 
-func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) error {
+func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, sendProgress func(percent int, status internal.TaskStatus, log string, err string)) error {
+
 	kubeadmInstallCommands := installer.installKubeadm()
 
 	isClusterExists, err := installer.r.CheckClusterTokenIPAndHash(context.Background(), 1)
 	if err != nil {
 		return err
+	}
+
+	commandNumber := 16
+	percent, k := 1, 1
+	percentNext := func() int {
+		percent = (k*100 - 1) / commandNumber
+		k++
+		return percent
 	}
 
 	if isClusterExists {
@@ -147,12 +161,16 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 	} else {
 		installer.l.Info("Adding new control plane to cluster")
 		kubeadmInstallCommands = append(kubeadmInstallCommands, installer.kubeadmInit()...)
+		commandNumber = 32
 	}
 
-	for i, command := range kubeadmInstallCommands {
+	log := make([]byte, 0, LOG_INITIAL_SIZE)
+
+	for _, command := range kubeadmInstallCommands {
 		exec, err := conn.Exec(string(command.Command))
-		installer.l.Info("installation percent", zap.Int("percent", (i+1)*100/len(kubeadmInstallCommands)))
+		log = pushToLog(log, []byte(command.Command), exec)
 		if err != nil && command.Condition != cl.Anyway {
+			sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
 			return err
 		}
@@ -160,101 +178,145 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 		if command.Parser != nil {
 			err = command.Parser(exec, nil)
 			if err != nil {
+				sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 				return err
 			}
+
 		}
+		sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
+		installer.l.Info("installation percent", zap.Int("percent", percent), zap.String("command", string(command.Command)))
 	}
 
 	err = installer.r.SetNodeClusterID(context.Background(), nodeid, 1)
 	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 		return err
 	}
 
 	if isClusterExists {
+		sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
 		return nil
 	}
 
-	// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
 	config, err := installer.getAdminConf(context.Background(), conn)
-	if err == nil {
-		err = os.WriteFile("./config", config, 0664)
-		if err != nil {
-			installer.l.Error("error writing admin.conf to ./config", zap.String("error", err.Error()))
-			return err
-		}
-	}
 
-	time.Sleep(30 * time.Second)
-
-	err = installer.hi.InstallChart("metallb", "metallb", "metallb", nil)
 	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 		return err
 	}
 
+	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
+
+	err = os.WriteFile("./config", config, 0664)
+	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
+		installer.l.Error("error writing admin.conf to ./config", zap.String("error", err.Error()))
+		return err
+	}
+
+	time.Sleep(30 * time.Second)
+	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
+
+	installer.hi.SetNewConfig()
+	err = installer.hi.InstallChart("metallb", "metallb", "metallb", nil)
+	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
+		return err
+	}
+
+	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	time.Sleep(30 * time.Second)
 
 	commandLib := ubuntu.Ubuntu2004CommandLib{}
 	command := commandLib.AddMetallbConf()
 
 	exec, err := conn.Exec(string(command.Command))
+	log = pushToLog(log, []byte(command.Command), exec)
 	installer.l.Info("metallb installed")
 	if err != nil && command.Condition != cl.Anyway {
-		installer.l.Error("exec failed", zap.String("command", string(command.Command)))
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
+		installer.l.Error("exec failed", zap.String("command", string(command.Command)), zap.String("res", string(exec)))
 		return err
 	}
 
+	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	if command.Parser != nil {
 		err = command.Parser(exec, nil)
 		if err != nil {
+			sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 			return err
 		}
 	}
 
+	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	time.Sleep(5 * time.Second)
 
 	err = installer.hi.InstallChart("nginx-ingress-controller", "bitnami", "nginx-ingress-controller", nil)
 	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 		return err
 	}
 
+	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	time.Sleep(30 * time.Second)
 
 	grafanaCommands := installer.kubeadmCreateGrafana()
-	for i, command := range grafanaCommands {
+	for _, command := range grafanaCommands {
 		exec, err := conn.Exec(string(command.Command))
-		installer.l.Info("grafana installation percent", zap.Int("percent", (i+1)*100/len(grafanaCommands)))
+		log = pushToLog(log, []byte(command.Command), exec)
+		installer.l.Info("grafana installation percent", zap.Int("percent", percent/len(grafanaCommands)))
+
 		if err != nil && command.Condition != cl.Anyway {
 			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
+			sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 			return err
 		}
 
 		if command.Parser != nil {
 			err = command.Parser(exec, nil)
 			if err != nil {
+				sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 				return err
 			}
 		}
+		sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	}
 
 	time.Sleep(1 * time.Minute)
 
+	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", grafanaArgs)
+
 	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 		return err
 	}
+
+	sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
 
 	time.Sleep(1 * time.Minute)
 	exec, err = conn.Exec("kubectl exec --namespace default -it $(kubectl get pods --namespace default -lapp.kubernetes.io/name=grafana -o jsonpath=\"{.items[0].metadata.name}\") grafana-cli admin reset-admin-password admin")
 	return nil
 }
 
-func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
+func (installer *Installer) RemoveK8S(conn client_conn.ClientConn, sendProgress func(percent int, status internal.TaskStatus, log string, err string)) error {
 	kubeadmStopCommands := installer.kubeadmReset()
+
+	percent, k := 1, 1
+	percentNext := func() int {
+		percent = (k*100 - 1) / 8
+		k++
+		return percent
+	}
+
+	log := make([]byte, 0, LOG_INITIAL_SIZE)
 
 	for i, command := range kubeadmStopCommands {
 		exec, err := conn.Exec(string(command.Command))
+		log = pushToLog(log, []byte(command.Command), exec)
 		installer.l.Info("installation percent", zap.Int("percent", (i+1)*100/len(kubeadmStopCommands)))
 		if err != nil && command.Condition != cl.Anyway {
+			sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
 			return err
 		} else if err != nil {
@@ -264,10 +326,13 @@ func (installer *Installer) RemoveK8S(conn client_conn.ClientConn) error {
 		if command.Parser != nil {
 			err = command.Parser(exec, nil)
 			if err != nil {
+				sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 				return err
 			}
 		}
+		sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	}
+	sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
 	return nil
 }
 
@@ -280,4 +345,9 @@ func (installer *Installer) getAdminConf(ctx context.Context, cc client_conn.Cli
 		return nil, err
 	}
 	return output, nil
+}
+
+func pushToLog(log []byte, command []byte, output []byte) []byte {
+	command = bytes.ReplaceAll(command, []byte("\n"), []byte("\n$ "))
+	return bytes.Join([][]byte{log, append([]byte("$ "), command...), output}, []byte("\n"))
 }

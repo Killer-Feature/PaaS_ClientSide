@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/Killer-Feature/PaaS_ServerSide v0.0.0-20230406070043-05b160aae1f6
 	github.com/gofrs/flock v0.8.1
+	github.com/gorilla/websocket v1.5.0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/pkg/errors v0.9.1
