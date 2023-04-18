@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/netip"
 	"os"
 	"strconv"
@@ -197,14 +196,12 @@ func (r *Repository) ResetNodeCluster(ctx context.Context, id int) error {
 }
 
 func (r *Repository) IsNodeExists(ctx context.Context, ip netip.Addr) (int, error) {
-	//sqlScript := "SELECT id FROM nodes WHERE ip_port=$1"
 	sqlScript := "SELECT id FROM nodes WHERE ip=$1"
 	rows, err := r.db.QueryContext(ctx, sqlScript, ip.String())
+	defer rows.Close()
 	if err != nil {
 		return 0, err
 	}
-
-	defer rows.Close()
 
 	var id int
 	for rows.Next() {
@@ -314,7 +311,7 @@ func (r *Repository) AddClusterTokenIPAndHash(ctx context.Context, clusterID int
 	sqlScript = "UPDATE clusters SET token = $1, hash = $2, master_ip=$3, master_id=$4 WHERE id = $5"
 	_, err = r.db.ExecContext(ctx, sqlScript, token, hash, masterIP, masterID, clusterID)
 	if err != nil {
-		r.l.Error("error during add cluster master to database", zap.Error(err), zap.String("values", fmt.Sprintf("%s | %s | %s | %d | %d", token, hash, masterIP, masterID, clusterID)))
+		r.l.Error("error during add cluster master to database", zap.Error(err))
 		return err
 	}
 	return nil
@@ -350,10 +347,7 @@ func (r *Repository) GetClusterTokenIPAndHash(ctx context.Context, clusterID int
 func (r *Repository) DeleteClusterTokenIPAndHash(ctx context.Context, clusterID int) (err error) {
 	sqlScript := `UPDATE clusters SET token = "", hash = "", master_ip="", master_id=0 WHERE id = $1`
 	_, err = r.db.ExecContext(ctx, sqlScript, clusterID)
-	if err != nil {
-		return err
-	}
-	return nil
+	return
 }
 
 func (r *Repository) GetResources(ctx context.Context) ([]models.ResourceData, error) {

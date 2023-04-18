@@ -268,7 +268,6 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 				return err
 			}
 		}
-
 		sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
 	}
 
