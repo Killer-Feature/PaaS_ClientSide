@@ -22,6 +22,13 @@ const (
 	LOG_INITIAL_SIZE = 2048
 )
 
+var (
+	grafanaArgs = map[string]string{
+		// comma seperated values to set
+		"set": "admin.password=admin",
+	}
+)
+
 type Installer struct {
 	r  internal.Repository
 	l  *zap.Logger
@@ -66,6 +73,9 @@ func (installer *Installer) kubeadmInit() []cl.CommandAndParser {
 		commandLib.AddKubeConfig(),
 		commandLib.UntaintControlPlane(),
 		commandLib.AddFlannel(),
+		commandLib.InstallHelm(),
+		commandLib.AddBitnamiRepo(),
+		commandLib.InstallPrometheus(),
 	}
 	return commands
 }
@@ -254,7 +264,8 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 	for _, command := range grafanaCommands {
 		exec, err := conn.Exec(string(command.Command))
 		log = pushToLog(log, []byte(command.Command), exec)
-		installer.l.Info("grafana installation percent", zap.Int("percent", percent))
+		installer.l.Info("grafana installation percent", zap.Int("percent", percent/len(grafanaCommands)))
+
 		if err != nil && command.Condition != cl.Anyway {
 			installer.l.Error("exec failed", zap.String("command", string(command.Command)))
 			sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
@@ -274,19 +285,17 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 	time.Sleep(1 * time.Minute)
 
 	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
-	err = installer.hi.InstallChart("prometheus", "bitnami", "kube-prometheus", nil)
-	if err != nil {
-		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
-		return err
-	}
-	sendProgress(percentNext(), internal.STATUS_IN_PROCESS, string(log), "")
-	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", nil)
+	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", grafanaArgs)
+
 	if err != nil {
 		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
 		return err
 	}
 
 	sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
+
+	time.Sleep(1 * time.Minute)
+	exec, err = conn.Exec("kubectl exec --namespace default -it $(kubectl get pods --namespace default -lapp.kubernetes.io/name=grafana -o jsonpath=\"{.items[0].metadata.name}\") grafana-cli admin reset-admin-password admin")
 	return nil
 }
 
@@ -327,12 +336,12 @@ func (installer *Installer) RemoveK8S(conn client_conn.ClientConn, sendProgress 
 	return nil
 }
 
-func (s *Installer) getAdminConf(ctx context.Context, cc client_conn.ClientConn) ([]byte, error) {
+func (installer *Installer) getAdminConf(ctx context.Context, cc client_conn.ClientConn) ([]byte, error) {
 	cl := ubuntu.Ubuntu2004CommandLib{}
 	getAdminConfCommand := cl.CatAdminConfFile()
 	output, err := cc.Exec(string(getAdminConfCommand.Command))
 	if err != nil {
-		s.l.Error("error getting admin.conf", zap.String("error", err.Error()))
+		installer.l.Error("error getting admin.conf", zap.String("error", err.Error()))
 		return nil, err
 	}
 	return output, nil

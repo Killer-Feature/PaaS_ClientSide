@@ -164,6 +164,30 @@ func (u *Ubuntu2004CommandLib) AddFlannel() cl.CommandAndParser {
 	}
 }
 
+func (u *Ubuntu2004CommandLib) InstallHelm() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "sudo snap install helm --classic",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (u *Ubuntu2004CommandLib) AddBitnamiRepo() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "helm repo add bitnami https://charts.bitnami.com/bitnami",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
+func (u *Ubuntu2004CommandLib) InstallPrometheus() cl.CommandAndParser {
+	return cl.CommandAndParser{
+		Command:   "helm install prometheus bitnami/kube-prometheus",
+		Parser:    nil,
+		Condition: cl.Required,
+	}
+}
+
 func (u *Ubuntu2004CommandLib) CreateFolderForPV() cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "sudo mkdir -p /devkube/postgres",
