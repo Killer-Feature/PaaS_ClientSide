@@ -13,9 +13,8 @@ import (
 )
 
 const (
-	READ_BUFSIZE          = 1024
-	WRITE_BUFSIZE         = 1024
-	CLUSTER_ID_PARAM_NAME = "clusterId"
+	READ_BUFSIZE  = 1024
+	WRITE_BUFSIZE = 1024
 )
 
 var upgrader = websocket.Upgrader{
@@ -54,9 +53,11 @@ func (h *Handler) Register(s *echo.Echo) {
 
 	s.POST("/api/addResource", h.AddResource)
 	s.POST("/api/removeResource", h.RemoveResource)
+	s.GET("/api/getResources", h.GetResources)
 
 	s.GET("/api/getAdminConfig", h.GetAdminConfig)
-	s.GET("/api/getResources", h.GetResources)
+
+	s.GET("/api/getServices", h.GetServices)
 
 	s.GET("/api/getProgress", h.GetProgress)
 
@@ -249,4 +250,15 @@ func (h *Handler) GetProgress(ctx echo.Context) error {
 
 	_ = h.u.GetProgress(ctx.Request().Context(), ws)
 	return nil
+}
+
+func (h *Handler) GetServices(ctx echo.Context) error {
+	resources, err := h.u.GetServices(ctx.Request().Context())
+	if err != nil {
+		return ctx.HTML(http.StatusInternalServerError, err.Error())
+	}
+	if resources == nil {
+		return ctx.NoContent(http.StatusOK)
+	}
+	return ctx.JSON(http.StatusOK, resources)
 }
