@@ -143,7 +143,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 		return err
 	}
 
-	commandNumber := 16
+	commandNumber := 20
 	percent, k := 1, 1
 	percentNext := func() int {
 		percent = (k*100 - 1) / commandNumber
@@ -161,7 +161,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 	} else {
 		installer.l.Info("Adding new control plane to cluster")
 		kubeadmInstallCommands = append(kubeadmInstallCommands, installer.kubeadmInit()...)
-		commandNumber = 32
+		commandNumber = 38
 	}
 
 	log := make([]byte, 0, LOG_INITIAL_SIZE)

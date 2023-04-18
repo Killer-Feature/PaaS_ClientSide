@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"net/netip"
 	"os"
+	"time"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -17,6 +20,7 @@ import (
 
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Service struct {
@@ -77,7 +81,7 @@ func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, err
 	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(context.Background(), node), node.IP)
 
 	if err == nil {
-		s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
+		s.progressCh <- internal.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
 	}
 
 	return int(taskID), err
@@ -209,17 +213,17 @@ func (s *Service) getAdminConf(ctx context.Context, cc cconn.ClientConn) ([]byte
 	return output, nil
 }
 
-func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error) {
+func (s *Service) GetResources(ctx context.Context) ([]internal.Resource, error) {
 	resources, err := s.hi.GetResourcesList()
 
 	if err != nil {
 		return nil, err
 	}
 
-	resourceList := make([]internal.Resourse, 0, len(resources))
+	resourceList := make([]internal.Resource, 0, len(resources))
 
 	for _, res := range resources {
-		resourceList = append(resourceList, internal.Resourse{
+		resourceList = append(resourceList, internal.Resource{
 			Name:          res.Name,
 			Status:        res.Status,
 			FirstDeployed: res.FirstDeployed,
@@ -233,6 +237,34 @@ func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error)
 		})
 	}
 	return resourceList, nil
+}
+
+func (s *Service) GetServices(ctx context.Context) ([]internal.Service, error) {
+	kubeconfig := "/home/ns/Desktop/tp/PaaS_ClientSide/config"
+
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	services, _ := clientset.CoreV1().Services("").List(context.Background(), metav1.ListOptions{})
+	serviceList := make([]internal.Service, 0, len(services.Items))
+
+	for _, res := range services.Items {
+		serviceList = append(serviceList, internal.Service{
+			Name:      res.Name,
+			Namespace: res.ObjectMeta.Namespace,
+			Type:      string(res.Spec.Type),
+			Created:   res.ObjectMeta.CreationTimestamp.String(),
+			Age:       time.Now().Sub(res.ObjectMeta.CreationTimestamp.Time).Round(time.Second).String(),
+		})
+	}
+	return serviceList, nil
 }
 
 func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error) {

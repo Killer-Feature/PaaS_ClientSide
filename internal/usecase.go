@@ -18,7 +18,8 @@ type Usecase interface {
 	AddResource(ctx context.Context, rType ResourceType, name string) error
 	RemoveResource(ctx context.Context, rType ResourceType, name string) error
 	GetAdminConfig(ctx context.Context, clusterId int) (*models.AdminConfig, error)
-	GetResources(ctx context.Context) ([]Resourse, error)
+	GetResources(ctx context.Context) ([]Resource, error)
+	GetServices(ctx context.Context) ([]Service, error)
 	RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error)
 	GetProgress(ctx context.Context, socket socketmanager.Socket) error
 }
@@ -38,7 +39,7 @@ type Node struct {
 
 type ResourceType int
 
-type Resourse struct {
+type Resource struct {
 	Name          string `json:"name"`
 	Status        string `json:"status"`
 	FirstDeployed string `json:"firstDeployed"`
@@ -49,6 +50,14 @@ type Resourse struct {
 	ChartVersion  string `json:"chartVersion"`
 	Type          string `json:"type"`
 	ChartURL      string `json:"chartURL"`
+}
+
+type Service struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Type      string `json:"type"`
+	Age       string `json:"age"`
+	Created   string `json:"created"`
 }
 
 const (
@@ -66,7 +75,6 @@ type TaskStatus string
 const (
 	STATUS_IN_QUEUE   TaskStatus = "in queue"
 	STATUS_START      TaskStatus = "started"
-	STATUS_CONN_ERR   TaskStatus = "connection error"
 	STATUS_IN_PROCESS TaskStatus = "in process"
 	STATUS_ERROR      TaskStatus = "error"
 	STATUS_SUCCESS    TaskStatus = "success"

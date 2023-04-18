@@ -298,7 +298,7 @@ func (hi *HelmInstaller) UninstallChart(name string) error {
 	return err
 }
 
-type Resourse struct {
+type Resource struct {
 	Name          string
 	Status        string
 	FirstDeployed string
@@ -311,7 +311,7 @@ type Resourse struct {
 	ChartURL      string
 }
 
-func (hi *HelmInstaller) GetResourcesList() ([]Resourse, error) {
+func (hi *HelmInstaller) GetResourcesList() ([]Resource, error) {
 	actionConfig := new(action.Configuration)
 	if err := actionConfig.Init(hi.config, hi.settings.Namespace(), os.Getenv("HELM_DRIVER"), hi.debug); err != nil {
 		return nil, err
@@ -324,9 +324,9 @@ func (hi *HelmInstaller) GetResourcesList() ([]Resourse, error) {
 		return nil, err
 	}
 
-	resourceList := make([]Resourse, 0, len(resources))
+	resourceList := make([]Resource, 0, len(resources))
 	for _, res := range resources {
-		resourceList = append(resourceList, Resourse{
+		resourceList = append(resourceList, Resource{
 			Name:          res.Name,
 			Status:        res.Info.Status.String(),
 			FirstDeployed: res.Info.FirstDeployed.String(),
