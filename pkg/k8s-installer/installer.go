@@ -17,6 +17,13 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	grafanaArgs = map[string]string{
+		// comma seperated values to set
+		"set": "admin.password=admin",
+	}
+)
+
 type Installer struct {
 	r  internal.Repository
 	l  *zap.Logger
@@ -231,11 +238,13 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 
 	time.Sleep(1 * time.Minute)
 
-	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", nil)
+	err = installer.hi.InstallChart("grafana", "bitnami", "grafana", grafanaArgs)
 	if err != nil {
 		return err
 	}
 
+	time.Sleep(1 * time.Minute)
+	exec, err = conn.Exec("kubectl exec --namespace default -it $(kubectl get pods --namespace default -lapp.kubernetes.io/name=grafana -o jsonpath=\"{.items[0].metadata.name}\") grafana-cli admin reset-admin-password admin")
 	return nil
 }
 

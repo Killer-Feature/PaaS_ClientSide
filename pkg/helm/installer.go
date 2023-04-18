@@ -34,6 +34,10 @@ var (
 		// comma seperated values to set
 		"set": "global.storageClass=local-storage,primary.persistence.size=4Gi,auth.postgresPassword=pgpass",
 	}
+	grafanaArgs = map[string]string{
+		// comma seperated values to set
+		"set": "admin.password=admin",
+	}
 )
 
 type HelmInstaller struct {
@@ -81,7 +85,7 @@ func (hi *HelmInstaller) Install(releaseName string, rType internal.ResourceType
 	case internal.Prometheus:
 		return hi.InstallChart(releaseName, hi.repoName, "kube-prometheus", nil)
 	case internal.Grafana:
-		return hi.InstallChart(releaseName, hi.repoName, "grafana", nil)
+		return hi.InstallChart(releaseName, hi.repoName, "grafana", grafanaArgs)
 	case internal.NginxIngressController:
 		return hi.InstallChart(releaseName, hi.repoName, "nginx-ingress-controller", nil)
 	case internal.MetalLB:
