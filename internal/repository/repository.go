@@ -42,7 +42,6 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		"master_ip" TEXT,
 		"token" TEXT,	
 		"hash" TEXT,
-		"admin_conf" TEXT,
 		"master_id" integer
 	  );`
 
@@ -187,6 +186,15 @@ func (r *Repository) SetNodeClusterID(ctx context.Context, id int, clusterID int
 	return nil
 }
 
+func (r *Repository) ResetNodeCluster(ctx context.Context, id int) error {
+	sqlScript := "UPDATE nodes SET cluster_id = 0, is_master=false WHERE id = $1"
+	_, err := r.db.ExecContext(ctx, sqlScript, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *Repository) IsNodeExists(ctx context.Context, ip netip.Addr) (int, error) {
 	sqlScript := "SELECT id FROM nodes WHERE ip=$1"
 	rows, err := r.db.QueryContext(ctx, sqlScript, ip.String())
@@ -291,15 +299,19 @@ func (r *Repository) GetClusterName(ctx context.Context, id int) (string, error)
 //}
 
 func (r *Repository) AddClusterTokenIPAndHash(ctx context.Context, clusterID int, token, masterIP, hash string) error {
-	sqlScript := "UPDATE clusters SET token = $1, hash = $2, master_ip=$3 WHERE id = $4"
-	_, err := r.db.ExecContext(ctx, sqlScript, token, hash, masterIP, clusterID)
+	masterID := 0
+	sqlScript := "UPDATE nodes SET is_master = $1 WHERE ip = $2 RETURNING id"
+	masterAddrPort, _ := netip.ParseAddrPort(masterIP)
+	err := r.db.QueryRowContext(ctx, sqlScript, true, masterAddrPort.Addr().String()).Scan(&masterID)
 	if err != nil {
+		r.l.Error("error during add cluster master to database", zap.Error(err))
 		return err
 	}
 
-	sqlScript = "UPDATE nodes SET is_master = $1 WHERE ip = $2"
-	_, err = r.db.ExecContext(ctx, sqlScript, true, masterIP)
+	sqlScript = "UPDATE clusters SET token = $1, hash = $2, master_ip=$3, master_id=$4 WHERE id = $5"
+	_, err = r.db.ExecContext(ctx, sqlScript, token, hash, masterIP, masterID, clusterID)
 	if err != nil {
+		r.l.Error("error during add cluster master to database", zap.Error(err))
 		return err
 	}
 	return nil
@@ -333,25 +345,8 @@ func (r *Repository) GetClusterTokenIPAndHash(ctx context.Context, clusterID int
 }
 
 func (r *Repository) DeleteClusterTokenIPAndHash(ctx context.Context, clusterID int) (err error) {
-	sqlScript := "DELETE FROM clusters WHERE id = $1"
+	sqlScript := `UPDATE clusters SET token = "", hash = "", master_ip="", master_id=0 WHERE id = $1`
 	_, err = r.db.ExecContext(ctx, sqlScript, clusterID)
-	return
-}
-
-func (r *Repository) UpdateAdminConf(ctx context.Context, clusterID int, adminConf string) (err error) {
-	sqlScript := "UPDATE clusters SET admin_conf = $1  WHERE id = $2"
-	_, err = r.db.ExecContext(ctx, sqlScript, adminConf, clusterID)
-	return err
-}
-
-func (r *Repository) GetAdminConf(ctx context.Context, clusterID int) (conf string, err error) {
-	var rawAdminConf sql.NullString
-	sqlScript := "SELECT admin_confh FROM clusters WHERE id = $1"
-	err = r.db.QueryRowContext(ctx, sqlScript, clusterID).Scan(&rawAdminConf)
-
-	if rawAdminConf.Valid {
-		conf = rawAdminConf.String
-	}
 	return
 }
 

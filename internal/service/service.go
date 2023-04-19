@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"net/netip"
+	"os"
+	"time"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -10,28 +14,36 @@ import (
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/socketmanager"
 	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
+
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Service struct {
-	r  internal.Repository
-	l  *zap.Logger
-	tm *taskmanager.Manager[netip.AddrPort]
-	hi *helm.HelmInstaller
+	r          internal.Repository
+	l          *zap.Logger
+	tm         *taskmanager.Manager[netip.AddrPort]
+	sm         *socketmanager.SocketManager[internal.Message]
+	hi         *helm.HelmInstaller
+	progressCh chan internal.Message
 
 	k8sInstaller *k8s_installer.Installer
 }
 
 func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager[netip.AddrPort], k8sInstaller *k8s_installer.Installer, hi *helm.HelmInstaller) internal.Usecase {
+	progressCh := make(chan internal.Message)
 	return &Service{
 		r:            r,
 		l:            l,
 		tm:           tm,
+		sm:           socketmanager.NewSocketManager[internal.Message](progressCh, nil, l),
 		k8sInstaller: k8sInstaller,
 		hi:           hi,
+		progressCh:   progressCh,
 	}
 }
 
@@ -67,25 +79,34 @@ func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, err
 	}
 
 	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(context.Background(), node), node.IP)
+
+	if err == nil {
+		s.progressCh <- internal.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
+	}
+
 	return int(taskID), err
 }
 
 func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
 	return func(taskID taskmanager.ID) error {
+		sendProgress := func(percent int, status internal.TaskStatus, log string, err string) {
+			s.progressCh <- internal.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+		}
+		sendProgress(1, internal.STATUS_START, "", "")
 		sshBuilder := ssh.NewSSHBuilder()
 		cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
 		if err != nil {
+			sendProgress(1, internal.STATUS_ERROR, "", err.Error())
 			return err
 		}
+		sendProgress(1, internal.STATUS_IN_PROCESS, "", "")
 		defer func(cc cconn.ClientConn) {
 			_ = cc.Close()
 		}(cc)
-		err = s.k8sInstaller.InstallK8S(cc, node.ID, node.IP.Addr().String())
-		if err != nil {
-			return err
-		}
 
-		return nil
+		err = s.k8sInstaller.InstallK8S(cc, node.ID, node.IP.Addr().String(), sendProgress)
+
+		return err
 	}
 }
 
@@ -156,7 +177,11 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 	cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
 
 	if err != nil {
-		return nil, err
+		configFile, err := os.ReadFile("./config")
+		if err != nil {
+			return nil, err
+		}
+		return &models.AdminConfig{Config: string(configFile)}, nil
 	}
 
 	defer func(cc cconn.ClientConn) {
@@ -165,14 +190,16 @@ func (s *Service) GetAdminConfig(ctx context.Context, clusterId int) (*models.Ad
 
 	output, err := s.getAdminConf(ctx, cc)
 
-	if err == nil {
-		adminConf := string(output)
-		_ = s.r.UpdateAdminConf(ctx, clusterId, adminConf)
-		return &models.AdminConfig{Config: adminConf}, nil
+	if err != nil {
+		configFile, err := os.ReadFile("./config")
+		if err != nil {
+			return nil, err
+		}
+		return &models.AdminConfig{Config: string(configFile)}, nil
 	}
 
-	adminConf, err := s.r.GetAdminConf(ctx, clusterId)
-	return &models.AdminConfig{Config: adminConf}, err
+	_ = os.WriteFile("./config", output, 666)
+	return &models.AdminConfig{Config: string(output)}, nil
 }
 
 func (s *Service) getAdminConf(ctx context.Context, cc cconn.ClientConn) ([]byte, error) {
@@ -186,17 +213,17 @@ func (s *Service) getAdminConf(ctx context.Context, cc cconn.ClientConn) ([]byte
 	return output, nil
 }
 
-func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error) {
+func (s *Service) GetResources(ctx context.Context) ([]internal.Resource, error) {
 	resources, err := s.hi.GetResourcesList()
 
 	if err != nil {
 		return nil, err
 	}
 
-	resourceList := make([]internal.Resourse, 0, len(resources))
+	resourceList := make([]internal.Resource, 0, len(resources))
 
 	for _, res := range resources {
-		resourceList = append(resourceList, internal.Resourse{
+		resourceList = append(resourceList, internal.Resource{
 			Name:          res.Name,
 			Status:        res.Status,
 			FirstDeployed: res.FirstDeployed,
@@ -212,6 +239,34 @@ func (s *Service) GetResources(ctx context.Context) ([]internal.Resourse, error)
 	return resourceList, nil
 }
 
+func (s *Service) GetServices(ctx context.Context) ([]internal.Service, error) {
+	kubeconfig := "/home/ns/Desktop/tp/PaaS_ClientSide/config"
+
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	services, _ := clientset.CoreV1().Services("").List(context.Background(), metav1.ListOptions{})
+	serviceList := make([]internal.Service, 0, len(services.Items))
+
+	for _, res := range services.Items {
+		serviceList = append(serviceList, internal.Service{
+			Name:      res.Name,
+			Namespace: res.ObjectMeta.Namespace,
+			Type:      string(res.Spec.Type),
+			Created:   res.ObjectMeta.CreationTimestamp.String(),
+			Age:       time.Now().Sub(res.ObjectMeta.CreationTimestamp.Time).Round(time.Second).String(),
+		})
+	}
+	return serviceList, nil
+}
+
 func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error) {
 	node, err := s.r.GetFullNode(ctx, id)
 	if err != nil {
@@ -219,11 +274,19 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 	}
 
 	taskID, err := s.tm.AddTask(s.removeNodeFromCurrentClusterProgressTask(context.Background(), node), node.IP)
+	if err == nil {
+		s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
+	}
 	return int(taskID), err
 }
 
 func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
 	return func(taskID taskmanager.ID) error {
+		sendProgress := func(percent int, status internal.TaskStatus, log string, err string) {
+			s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+		}
+
+		sendProgress(1, internal.STATUS_START, "", "")
 		sshBuilder := ssh.NewSSHBuilder()
 		cc, err := sshBuilder.CreateCC(node.IP, node.Login, node.Password)
 		if err != nil {
@@ -232,14 +295,14 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 		defer func(cc cconn.ClientConn) {
 			_ = cc.Close()
 		}(cc)
-		err = s.k8sInstaller.RemoveK8S(cc)
+		err = s.k8sInstaller.RemoveK8S(cc, sendProgress)
 		if err != nil {
 			return err
 		}
 
-		defer func(r internal.Repository, ctx context.Context, id int, clusterID int) {
-			_ = r.SetNodeClusterID(ctx, id, clusterID)
-		}(s.r, ctx, node.ID, 0)
+		defer func(r internal.Repository, ctx context.Context, id int) {
+			_ = r.ResetNodeCluster(ctx, id)
+		}(s.r, ctx, node.ID)
 
 		_, masterIpStr, _, err := s.r.GetClusterTokenIPAndHash(ctx, 1)
 		if err != nil {
@@ -266,4 +329,9 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 
 		return nil
 	}
+}
+
+func (s *Service) GetProgress(ctx context.Context, socket socketmanager.Socket) error {
+	s.sm.SetSocket(socket)
+	return nil
 }

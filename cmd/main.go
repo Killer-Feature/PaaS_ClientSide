@@ -63,6 +63,9 @@ func main() {
 
 	//m := middleware.NewMiddleware(p.Logger, metrics)
 	//m.Register(server)
+
+	server.Use(middleware.Recover())
+
 	server.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     []string{"*"},
 		AllowCredentials: true,
