@@ -75,14 +75,25 @@ func (installer *Installer) kubeadmInit() []cl.CommandAndParser {
 	return commands
 }
 
-func (installer *Installer) kubeadmCreateGrafana() []cl.CommandAndParser {
+func (installer *Installer) kubeadmCreateGrafana(hostname string) []cl.CommandAndParser {
 	commandLib := ubuntu.Ubuntu2004CommandLib{}
+
+	var userID int
+	switch hostname {
+	case "vk-edu-diploma-kf-1-2-2-15gb":
+		userID = 1
+	case "vk-edu-diploma-kf-2-2-2-20gb":
+		userID = 2
+	case "vk-edu-diploma-kf-3-2-2-20gb":
+		userID = 3
+	default:
+	}
 
 	commands := []cl.CommandAndParser{
 		commandLib.AddStorageClass(),
-		commandLib.AddGrafanaPV(),
-		commandLib.AddPostgresPV(),
-		commandLib.AddGrafanaIngress(),
+		commandLib.AddGrafanaPV(hostname),
+		commandLib.AddPostgresPV(hostname),
+		commandLib.AddGrafanaIngress(userID),
 		commandLib.CreateFolderForPV(),
 	}
 	return commands
@@ -129,7 +140,7 @@ func (installer *Installer) parseKubeadmInit(output []byte, extraData interface{
 	return installer.r.AddClusterTokenIPAndHash(context.Background(), 1, matchMap["token"], matchMap["hostport"], matchMap["hash"])
 }
 
-func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) error {
+func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, nodeIP string) error {
 	kubeadmInstallCommands := installer.installKubeadm()
 
 	isClusterExists, err := installer.r.CheckClusterTokenIPAndHash(context.Background(), 1)
@@ -174,6 +185,11 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 		return nil
 	}
 
+	hostname, err := conn.Exec("hostname")
+	if err != nil {
+		return err
+	}
+
 	// TODO: это надо делать вообще только при добавлении мастера, для этого надо перенести эту операцию в s.k8sInstaller.InstallK8S(cc)
 	config, err := installer.getAdminConf(context.Background(), conn)
 	if err == nil {
@@ -194,7 +210,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 	time.Sleep(30 * time.Second)
 
 	commandLib := ubuntu.Ubuntu2004CommandLib{}
-	command := commandLib.AddMetallbConf()
+	command := commandLib.AddMetallbConf(nodeIP)
 
 	exec, err := conn.Exec(string(command.Command))
 	installer.l.Info("metallb installed")
@@ -219,7 +235,7 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int) 
 
 	time.Sleep(30 * time.Second)
 
-	grafanaCommands := installer.kubeadmCreateGrafana()
+	grafanaCommands := installer.kubeadmCreateGrafana(string(hostname))
 	for i, command := range grafanaCommands {
 		exec, err := conn.Exec(string(command.Command))
 		installer.l.Info("grafana installation percent", zap.Int("percent", (i+1)*100/len(grafanaCommands)))

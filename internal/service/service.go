@@ -80,7 +80,7 @@ func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node 
 		defer func(cc cconn.ClientConn) {
 			_ = cc.Close()
 		}(cc)
-		err = s.k8sInstaller.InstallK8S(cc, node.ID)
+		err = s.k8sInstaller.InstallK8S(cc, node.ID, node.IP.Addr().String())
 		if err != nil {
 			return err
 		}
