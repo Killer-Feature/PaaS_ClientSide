@@ -215,7 +215,7 @@ func (u *Ubuntu2004CommandLib) AddMetallbConf(ip string) cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) AddPostgresPV(hostname string, number int) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command(fmt.Sprintf("kubectl apply -f - <<EOF \n---\napiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: pv-%i\n  labels:\n    type: local\nspec:\n  capacity:\n    storage: 1Gi\n  volumeMode: Filesystem\n  accessModes:\n  - ReadWriteOnce\n  persistentVolumeReclaimPolicy: Retain\n  storageClassName: local-storage\n  local:\n    path: /devkube/postgresql\n  nodeAffinity:\n    required:\n      nodeSelectorTerms:\n      - matchExpressions:\n        - key: kubernetes.io/hostname\n          operator: In\n          values:\n          - %s\nEOF", number, hostname)),
+		Command:   cl.Command(fmt.Sprintf("kubectl apply -f - <<EOF \napiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: pv-%i\n  labels:\n    type: local\nspec:\n  capacity:\n    storage: 1Gi\n  volumeMode: Filesystem\n  accessModes:\n  - ReadWriteOnce\n  persistentVolumeReclaimPolicy: Retain\n  storageClassName: local-storage\n  local:\n    path: /devkube/postgresql\n  nodeAffinity:\n    required:\n      nodeSelectorTerms:\n      - matchExpressions:\n        - key: kubernetes.io/hostname\n          operator: In\n          values:\n          - %s\nEOF", number, hostname)),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -223,7 +223,7 @@ func (u *Ubuntu2004CommandLib) AddPostgresPV(hostname string, number int) cl.Com
 
 func (u *Ubuntu2004CommandLib) AddGrafanaPV(hostname string) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command(fmt.Sprintf("kubectl apply -f - <<EOF \n---\napiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: pv-grafana\n  labels:\n    type: local\nspec:\n  capacity:\n    storage: 10Gi\n  volumeMode: Filesystem\n  accessModes:\n  - ReadWriteOnce\n  persistentVolumeReclaimPolicy: Retain\n  storageClassName: local-storage\n  local:\n    path: /devkube/postgresql\n  nodeAffinity:\n    required:\n      nodeSelectorTerms:\n      - matchExpressions:\n        - key: kubernetes.io/hostname\n          operator: In\n          values:\n          - %s\nEOF", hostname)),
+		Command:   cl.Command(fmt.Sprintf("kubectl apply -f - <<EOF\napiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: pv-grafana\n  labels:\n    type: local\nspec:\n  capacity:\n    storage: 10Gi\n  volumeMode: Filesystem\n  accessModes:\n  - ReadWriteOnce\n  persistentVolumeReclaimPolicy: Retain\n  storageClassName: local-storage\n  local:\n    path: /devkube/postgresql\n  nodeAffinity:\n    required:\n      nodeSelectorTerms:\n      - matchExpressions:\n        - key: kubernetes.io/hostname\n          operator: In\n          values:\n          - %s\nEOF", hostname)),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
@@ -231,7 +231,7 @@ func (u *Ubuntu2004CommandLib) AddGrafanaPV(hostname string) cl.CommandAndParser
 
 func (u *Ubuntu2004CommandLib) AddGrafanaIngress(userNum int) cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   cl.Command(fmt.Sprintf("kubectl apply -f - <<EOF \n---\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: grafana-ingress\nspec:\n  ingressClassName: nginx\n  rules:\n  - host: \"grafana.user%d.huginn.pro\"\n    http:\n      paths:\n      - path: /\n        pathType: Prefix\n        backend:\n          service:\n            name: grafana\n            port:\n              number: 3000\nEOF", userNum)),
+		Command:   cl.Command(fmt.Sprintf("kubectl apply -f - <<EOF\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: grafana-ingress\nspec:\n  ingressClassName: nginx\n  rules:\n  - host: \"grafana.user%d.huginn.pro\"\n    http:\n      paths:\n      - path: /\n        pathType: Prefix\n        backend:\n          service:\n            name: grafana\n            port:\n              number: 3000\nEOF", userNum)),
 		Parser:    nil,
 		Condition: cl.Required,
 	}
