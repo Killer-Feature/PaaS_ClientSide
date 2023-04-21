@@ -32,11 +32,14 @@ import (
 var (
 	prometheusArgs = map[string]string{
 		// comma seperated values to set
-		"set": "global.storageClass=local-storage,primary.persistence.size=4Gi,auth.postgresPassword=pgpass",
+		"set": "global.storageClass=local-storage,primary.persistence.size=1Gi,auth.postgresPassword=pgpass",
 	}
 	grafanaArgs = map[string]string{
 		// comma seperated values to set
 		"set": "admin.password=admin",
+	}
+	redisArgs = map[string]string{
+		"set": "master.persistence.enabled=false,replica.persistence.enabled=false",
 	}
 )
 
@@ -85,7 +88,7 @@ func (hi *HelmInstaller) Install(releaseName string, rType internal.ResourceType
 	case internal.Postgres:
 		return hi.InstallChart(releaseName, hi.repoName, "postgresql", prometheusArgs)
 	case internal.Redis:
-		return hi.InstallChart(releaseName, hi.repoName, "redis", nil)
+		return hi.InstallChart(releaseName, hi.repoName, "redis", redisArgs)
 	case internal.Prometheus:
 		return hi.InstallChart(releaseName, hi.repoName, "kube-prometheus", nil)
 	case internal.Grafana:

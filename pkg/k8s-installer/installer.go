@@ -97,7 +97,8 @@ func (installer *Installer) kubeadmCreateGrafana(hostname string) []cl.CommandAn
 	commands := []cl.CommandAndParser{
 		commandLib.AddStorageClass(),
 		commandLib.AddGrafanaPV(hostname),
-		commandLib.AddPostgresPV(hostname),
+		commandLib.AddPostgresPV(hostname, 1),
+		commandLib.AddPostgresPV(hostname, 2),
 		commandLib.AddGrafanaIngress(userID),
 		commandLib.CreateFolderForPV(),
 	}
