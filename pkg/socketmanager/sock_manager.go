@@ -12,7 +12,7 @@ import (
 
 type SocketManager[msgType any] struct {
 	s           *websocket.Conn
-	sMux        sync.RWMutex
+	sMux        sync.Mutex
 	l           *zap.Logger
 	ch          <-chan msgType
 	cancelFuncs []func()
@@ -53,13 +53,13 @@ func (sm *SocketManager[msgType]) SetSocket(s *websocket.Conn) {
 
 func (sm *SocketManager[msgType]) run() {
 	for msg := range sm.ch {
-		sm.sMux.RLock()
+		sm.sMux.Lock()
 		if sm.s == nil {
-			sm.sMux.RUnlock()
+			sm.sMux.Unlock()
 			continue
 		}
 		err := sm.s.WriteJSON(msg)
-		sm.sMux.RUnlock()
+		sm.sMux.Unlock()
 		if err != nil {
 			if isCloseError(err) || errors.Is(err, syscall.EPIPE) {
 				sm.SetSocket(nil)
@@ -84,16 +84,16 @@ func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duratio
 		case <-ctx.Done():
 			return
 		case _ = <-ticker.C:
-			sm.sMux.RLock()
+			sm.sMux.Lock()
 			if sm.s == nil {
-				sm.sMux.RUnlock()
+				sm.sMux.Unlock()
 				return
 			}
 
 			msg := process()
 
 			err := sm.s.WriteJSON(msg)
-			sm.sMux.RUnlock()
+			sm.sMux.Unlock()
 
 			if err != nil {
 				if isCloseError(err) || errors.Is(err, syscall.EPIPE) {
