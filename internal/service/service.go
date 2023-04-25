@@ -14,10 +14,12 @@ import (
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/executor"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
 	k8s_installer "github.com/Killer-Feature/PaaS_ClientSide/pkg/k8s-installer"
+
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/os_command_lib/ubuntu"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/socketmanager"
 	cconn "github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn"
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/client_conn/ssh"
+	"github.com/gorilla/websocket"
 
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
@@ -338,7 +340,11 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 	}
 }
 
-func (s *Service) GetProgress(ctx context.Context, socket socketmanager.Socket) error {
+func (s *Service) GetProgress(ctx context.Context, socket *websocket.Conn) error {
 	s.sm.SetSocket(socket)
+
+	go s.sm.SendResultToSocketByTicker(time.Second, func() interface{} {
+		return interface{}(struct{ Message string }{"Message"})
+	})
 	return nil
 }
