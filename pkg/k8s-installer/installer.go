@@ -405,7 +405,7 @@ func (installer *Installer) portForwarding(namespace, appName, portLocal, portRe
 	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
 
 	go func() {
-		forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%s:%s", portLocal, portRemote)}, nil, nil, out, errOut)
+		forwarder, err := portforward.NewOnAddresses(dialer, []string{"0.0.0.0"}, []string{fmt.Sprintf("%s:%s", portLocal, portRemote)}, nil, nil, out, errOut)
 		if err = forwarder.ForwardPorts(); err != nil { // Locks until stopChan is closed.
 			installer.l.Error("error forwarding", zap.Error(err))
 		}

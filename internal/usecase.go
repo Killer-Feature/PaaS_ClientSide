@@ -3,7 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
-	"github.com/Killer-Feature/PaaS_ClientSide/pkg/socketmanager"
+	"github.com/gorilla/websocket"
 	"net/netip"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -21,7 +21,7 @@ type Usecase interface {
 	GetResources(ctx context.Context) ([]Resource, error)
 	GetServices(ctx context.Context) ([]Service, error)
 	RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error)
-	GetProgress(ctx context.Context, socket socketmanager.Socket) error
+	GetProgress(ctx context.Context, socket *websocket.Conn) error
 }
 
 var (
