@@ -5,11 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -17,6 +12,12 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/pkg/helm"
@@ -33,7 +34,7 @@ const (
 var (
 	grafanaArgs = map[string]string{
 		// comma seperated values to set
-		"set": "admin.password=admin",
+		"set": "admin.password=admin,dashboardsProvider.enabled=true,datasources.secretName=datasource-secret,dashboardsConfigMaps[0].configMapName=grafana-dashboard,dashboardsConfigMaps[0].fileName=def_dashboard.json",
 	}
 )
 
@@ -108,6 +109,8 @@ func (installer *Installer) kubeadmCreateGrafana(hostname string) []cl.CommandAn
 		//commandLib.AddPostgresPV(hostname, 1),
 		//commandLib.AddPostgresPV(hostname, 2),
 		commandLib.AddGrafanaIngress(userID),
+		commandLib.AddGrafanaDatasourceSecret(),
+		commandLib.AddGrafanaDashboardConfigMap(),
 		commandLib.CreateFolderForPV(),
 	}
 	return commands

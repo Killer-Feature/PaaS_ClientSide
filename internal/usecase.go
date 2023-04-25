@@ -3,12 +3,15 @@ package internal
 import (
 	"context"
 	"errors"
-	"github.com/Killer-Feature/PaaS_ClientSide/pkg/socketmanager"
 	"net/netip"
+
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/socketmanager"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
 )
 
+// Usecase interface implements functions for Huginn service
+// Need to be implemented in main func
 type Usecase interface {
 	ExecCommand(command string) ([]byte, error)
 	GetClusterNodes(ctx context.Context) ([]Node, error)

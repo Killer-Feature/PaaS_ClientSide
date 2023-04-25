@@ -2,11 +2,12 @@ package service
 
 import (
 	"context"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"net/netip"
 	"os"
 	"time"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/models"
@@ -34,6 +35,8 @@ type Service struct {
 	k8sInstaller *k8s_installer.Installer
 }
 
+// NewService returns instance of Huginn service
+// Receives repository, logger and taskmanager structs as pointer
 func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager[netip.AddrPort], k8sInstaller *k8s_installer.Installer, hi *helm.HelmInstaller) internal.Usecase {
 	progressCh := make(chan internal.Message)
 	return &Service{
