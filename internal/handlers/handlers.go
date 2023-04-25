@@ -255,6 +255,7 @@ func (h *Handler) GetProgress(ctx echo.Context) error {
 func (h *Handler) GetServices(ctx echo.Context) error {
 	resources, err := h.u.GetServices(ctx.Request().Context())
 	if err != nil {
+		h.logger.Error("error getting services", zap.Error(err))
 		return ctx.HTML(http.StatusInternalServerError, err.Error())
 	}
 	if resources == nil {

@@ -240,19 +240,23 @@ func (s *Service) GetResources(ctx context.Context) ([]internal.Resource, error)
 }
 
 func (s *Service) GetServices(ctx context.Context) ([]internal.Service, error) {
-	kubeconfig := "/home/ns/Desktop/tp/PaaS_ClientSide/config"
+	kubeconfig := "./config"
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
-	services, _ := clientset.CoreV1().Services("").List(context.Background(), metav1.ListOptions{})
+	services, err := clientset.CoreV1().Services("").List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	serviceList := make([]internal.Service, 0, len(services.Items))
 
 	for _, res := range services.Items {
