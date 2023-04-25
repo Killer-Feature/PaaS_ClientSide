@@ -2,14 +2,15 @@ package handlers
 
 import (
 	"embed"
-	"github.com/Killer-Feature/PaaS_ClientSide/internal"
-	"github.com/gorilla/websocket"
-	echo "github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"io/fs"
 	"log"
 	"net/http"
 	"net/netip"
+
+	"github.com/Killer-Feature/PaaS_ClientSide/internal"
+	"github.com/gorilla/websocket"
+	echo "github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 )
 
 const (
@@ -34,12 +35,15 @@ func NewHandler(logger *zap.Logger, u internal.Usecase) *Handler {
 	return &Handler{logger: logger, u: u}
 }
 
+// Embedding static files to add it in binary
+//
 //go:embed dist/assets
 var ui embed.FS
 
 //go:embed dist/index.html
 var htmlPage string
 
+// Register func receives echo server and register all http handlers
 func (h *Handler) Register(s *echo.Echo) {
 	// Register http handlers
 	s.GET("/hello", h.GetHello)
@@ -72,6 +76,7 @@ func (h *Handler) Register(s *echo.Echo) {
 	})
 }
 
+// GetHello func is deprecated
 func (h *Handler) GetHello(c echo.Context) error {
 
 	h.logger.Info("request received", zap.String("host", c.Request().RemoteAddr), zap.String("command", c.QueryParam("command")))
@@ -84,6 +89,7 @@ func (h *Handler) GetHello(c echo.Context) error {
 	return c.HTML(http.StatusOK, string(command))
 }
 
+// GetClusterNodes returns all cluster nodes in huginn database
 func (h *Handler) GetClusterNodes(c echo.Context) error {
 	nodes, err := h.u.GetClusterNodes(c.Request().Context())
 	if err != nil {
@@ -92,6 +98,7 @@ func (h *Handler) GetClusterNodes(c echo.Context) error {
 	return c.JSON(http.StatusOK, nodes)
 }
 
+// InputNode is struct for casting node data in json format
 type InputNode struct {
 	ID       int    `json:"id"`
 	Name     string `json:"name"`
@@ -100,6 +107,7 @@ type InputNode struct {
 	Password string `json:"password"`
 }
 
+// AddNodeToCluster adds new node to huginn database and checks is it available via ssh connecting
 func (h *Handler) AddNodeToCluster(ctx echo.Context) error {
 	nodeData := NodeID{}
 	if err := ctx.Bind(&nodeData); err != nil {
