@@ -3,8 +3,16 @@ package k8s_installer
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
+	"net/http"
 	"net/netip"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -292,10 +300,23 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 		return err
 	}
 
-	sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
-
 	time.Sleep(1 * time.Minute)
 	exec, err = conn.Exec("kubectl exec --namespace default -it $(kubectl get pods --namespace default -lapp.kubernetes.io/name=grafana -o jsonpath=\"{.items[0].metadata.name}\") grafana-cli admin reset-admin-password admin")
+
+	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
+		return err
+	}
+
+	err = installer.portForwarding("default", "grafana", "3000", "3000")
+	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
+		installer.l.Error("exec failed", zap.String("command", string(command.Command)))
+		return err
+	}
+
+	sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
+
 	return nil
 }
 
@@ -345,6 +366,45 @@ func (installer *Installer) getAdminConf(ctx context.Context, cc client_conn.Cli
 		return nil, err
 	}
 	return output, nil
+}
+
+func (installer *Installer) portForwarding(namespace, appName, portLocal, portRemote string) error {
+	config, err := clientcmd.BuildConfigFromFlags("", "./config")
+	if err != nil {
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	pods, err := clientset.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{LabelSelector: `app.kubernetes.io/name=` + appName})
+	if len(pods.Items) != 1 {
+		return errors.New("error no found or multiple choices pods by labelselector" + `app.kubernetes.io/name=` + appName)
+	}
+
+	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", namespace, pods.Items[0].ObjectMeta.Name)
+	hostIP := strings.TrimLeft(config.Host, "htps:/")
+	serverURL := url.URL{Scheme: "https", Path: path, Host: hostIP}
+
+	roundTripper, upgrader, err := spdy.RoundTripperFor(config)
+	if err != nil {
+		return err
+	}
+
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: roundTripper}, http.MethodPost, &serverURL)
+
+	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
+
+	go func() {
+		forwarder, err := portforward.New(dialer, []string{fmt.Sprintf("%s:%s", portLocal, portRemote)}, nil, nil, out, errOut)
+		if err = forwarder.ForwardPorts(); err != nil { // Locks until stopChan is closed.
+			installer.l.Error("error forwarding", zap.Error(err))
+		}
+	}()
+
+	return nil
 }
 
 func pushToLog(log []byte, command []byte, output []byte) []byte {
