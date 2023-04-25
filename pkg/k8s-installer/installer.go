@@ -315,6 +315,13 @@ func (installer *Installer) InstallK8S(conn client_conn.ClientConn, nodeid int, 
 		return err
 	}
 
+	err = installer.portForwarding("default", "prometheus", "9090", "9090")
+	if err != nil {
+		sendProgress(percentNext(), internal.STATUS_ERROR, string(log), err.Error())
+		installer.l.Error("exec failed", zap.String("command", string(command.Command)))
+		return err
+	}
+
 	sendProgress(100, internal.STATUS_SUCCESS, string(log), "")
 
 	return nil
@@ -376,7 +383,7 @@ func (installer *Installer) portForwarding(namespace, appName, portLocal, portRe
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 
 	pods, err := clientset.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{LabelSelector: `app.kubernetes.io/name=` + appName})
