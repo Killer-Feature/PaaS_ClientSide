@@ -11,58 +11,57 @@ import (
 )
 
 type SocketManager[msgType any] struct {
-	s           *websocket.Conn
-	sMux        sync.Mutex
-	l           *zap.Logger
-	ch          <-chan msgType
-	cancelFuncs []func()
-	cMux        sync.Mutex
+	s                       []*websocket.Conn
+	sMux                    sync.Mutex
+	fMux                    sync.Mutex
+	l                       *zap.Logger
+	ch                      <-chan msgType
+	cMux                    sync.Mutex
+	cancelFunc              func()
+	forceSendResultToSocket func()
 }
 
-func NewSocketManager[msgType any](ch <-chan msgType, s *websocket.Conn, l *zap.Logger) *SocketManager[msgType] {
+func (sm *SocketManager[msgType]) ForceSendResultToSocket() {
+	sm.fMux.Lock()
+	defer sm.fMux.Unlock()
+	if sm.forceSendResultToSocket != nil {
+		sm.forceSendResultToSocket()
+	}
+}
+
+func NewSocketManager[msgType any](ch <-chan msgType, l *zap.Logger) *SocketManager[msgType] {
 	sm := SocketManager[msgType]{
-		l:           l,
-		s:           s,
-		ch:          ch,
-		cancelFuncs: make([]func(), 0),
+		l:  l,
+		s:  make([]*websocket.Conn, 0),
+		ch: ch,
 	}
 	go sm.run()
 	return &sm
 }
 
-func (sm *SocketManager[msgType]) SetSocket(s *websocket.Conn) {
+func (sm *SocketManager[msgType]) AddSocket(s *websocket.Conn) {
 	sm.sMux.Lock()
 	defer sm.sMux.Unlock()
 
-	if sm.s != nil {
-		err := sm.s.Close()
-		if err != nil {
-			sm.l.Error("error closing socket", zap.String("error", err.Error()))
-		}
-	}
-
-	sm.cMux.Lock()
-	for _, cancelFunc := range sm.cancelFuncs {
-		cancelFunc()
-	}
-	sm.cancelFuncs = make([]func(), 0)
-	sm.cMux.Unlock()
-
-	sm.s = s
+	sm.s = append(sm.s, s)
 }
 
-func (sm *SocketManager[msgType]) run() {
-	for msg := range sm.ch {
-		sm.sMux.Lock()
-		if sm.s == nil {
-			sm.sMux.Unlock()
-			continue
-		}
-		err := sm.s.WriteJSON(msg)
-		sm.sMux.Unlock()
+func (sm *SocketManager[msgType]) writeJSON(msg interface{}) {
+	sm.sMux.Lock()
+	defer sm.sMux.Unlock()
+	for i, sock := range sm.s {
+		err := sock.WriteJSON(msg)
 		if err != nil {
 			if isCloseError(err) || errors.Is(err, syscall.EPIPE) {
-				sm.SetSocket(nil)
+				sm.s = append(sm.s[:i], sm.s[i+1:]...)
+			}
+			if len(sm.s) == 0 {
+				sm.cMux.Lock()
+				if sm.cancelFunc != nil {
+					sm.cancelFunc()
+					sm.cancelFunc = nil
+				}
+				sm.cMux.Unlock()
 				return
 			}
 			sm.l.Error("send to socket error", zap.String("err", err.Error()))
@@ -70,18 +69,25 @@ func (sm *SocketManager[msgType]) run() {
 	}
 }
 
-func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duration, process func() interface{}) func() {
+func (sm *SocketManager[msgType]) run() {
+	for msg := range sm.ch {
+		sm.writeJSON(msg)
+	}
+}
+
+func (sm *SocketManager[msgType]) CountSockets() int {
+	sm.sMux.Lock()
+	defer sm.sMux.Unlock()
+	return len(sm.s)
+}
+
+func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duration, process func() interface{}) {
 	ctx, cancel := context.WithCancel(context.Background())
 	sm.cMux.Lock()
-	sm.cancelFuncs = append(sm.cancelFuncs, cancel)
+	sm.cancelFunc = cancel
 	sm.cMux.Unlock()
 
 	doProcessAndSend := func() {
-		sm.sMux.Lock()
-		defer sm.sMux.Unlock()
-		if sm.s == nil {
-			return
-		}
 
 		var msg interface{}
 		for i := 0; i < 3; i++ {
@@ -94,18 +100,16 @@ func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duratio
 			return
 		}
 
-		err := sm.s.WriteJSON(msg)
-
-		if err != nil {
-			if isCloseError(err) || errors.Is(err, syscall.EPIPE) {
-				sm.SetSocket(nil)
-				return
-			}
-			sm.l.Error("send to socket error", zap.String("err", err.Error()))
-		}
+		sm.writeJSON(msg)
 	}
 
 	forceChan := make(chan struct{})
+
+	sm.fMux.Lock()
+	sm.forceSendResultToSocket = func() {
+		forceChan <- struct{}{}
+	}
+	sm.fMux.Unlock()
 
 	go func() {
 		ticker := time.NewTicker(period)
@@ -116,16 +120,18 @@ func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duratio
 			case <-ctx.Done():
 				return
 			case <-forceChan:
+				if sm.CountSockets() == 0 {
+					return
+				}
 				doProcessAndSend()
 			case <-ticker.C:
+				if sm.CountSockets() == 0 {
+					return
+				}
 				doProcessAndSend()
 			}
 		}
 	}()
-
-	return func() {
-		forceChan <- struct{}{}
-	}
 }
 
 func isCloseError(err error) bool {

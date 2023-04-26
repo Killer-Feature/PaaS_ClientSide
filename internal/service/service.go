@@ -49,7 +49,7 @@ func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager[ne
 		r:            r,
 		l:            l,
 		tm:           tm,
-		sm:           socketmanager.NewSocketManager[internal.Message](progressCh, nil, l),
+		sm:           socketmanager.NewSocketManager[internal.Message](progressCh, l),
 		k8sInstaller: k8sInstaller,
 		hi:           hi,
 		progressCh:   progressCh,
@@ -351,9 +351,13 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 }
 
 func (s *Service) GetProgress(ctx context.Context, socket *websocket.Conn) error {
-	s.sm.SetSocket(socket)
-	forceSendMetrics := s.sm.SendResultToSocketByTicker(time.Second*10, s.getCollectMetricsFunc())
-	forceSendMetrics()
+	s.sm.AddSocket(socket)
+
+	if s.sm.CountSockets() == 1 {
+		s.sm.SendResultToSocketByTicker(time.Second*10, s.getCollectMetricsFunc())
+	}
+	s.sm.ForceSendResultToSocket()
+
 	return nil
 }
 
@@ -373,6 +377,8 @@ func (s *Service) getCollectMetricsFunc() func() interface{} {
 	return func() interface{} {
 		client, err := api.NewClient(api.Config{
 			Address: "http://0.0.0.0:9090/",
+			//Address: "http://5.188.142.208:9090/",
+			//Address: "http://localhost:9090/",
 			//Address: "http://89.208.220.55:9090/",
 		})
 		if err != nil {
