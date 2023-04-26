@@ -352,7 +352,7 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 
 func (s *Service) GetProgress(ctx context.Context, socket *websocket.Conn) error {
 	s.sm.SetSocket(socket)
-	forceSendMetrics := s.sm.SendResultToSocketByTicker(time.Second*8, s.getCollectMetricsFunc())
+	forceSendMetrics := s.sm.SendResultToSocketByTicker(time.Second*10, s.getCollectMetricsFunc())
 	forceSendMetrics()
 	return nil
 }
@@ -373,6 +373,7 @@ func (s *Service) getCollectMetricsFunc() func() interface{} {
 	return func() interface{} {
 		client, err := api.NewClient(api.Config{
 			Address: "http://0.0.0.0:9090/",
+			//Address: "http://89.208.220.55:9090/",
 		})
 		if err != nil {
 			return nil
