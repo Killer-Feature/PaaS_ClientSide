@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/netip"
 	"os"
 	"time"
@@ -63,11 +64,17 @@ func (s *Service) GetClusterNodes(ctx context.Context) ([]internal.Node, error) 
 	}
 
 	respNodes := make([]internal.Node, len(nodes))
-
+	var masterIP netip.AddrPort
+	for _, node := range nodes {
+		if node.IsMaster {
+			masterIP = node.IP
+		}
+	}
 	for i, node := range nodes {
 		respNodes[i] = internal.Node{
 			ID:        node.ID,
 			IP:        node.IP,
+			GrafanaIP: fmt.Sprintf("http://%s:3000/d/nMnqQpEVk/kubernetes-cluster-monitoring-via-prometheus?orgId=1&refresh=10s", masterIP.Addr().String()),
 			Name:      node.Name,
 			ClusterID: node.ClusterID,
 			IsMaster:  node.IsMaster,
