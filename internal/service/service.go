@@ -385,7 +385,7 @@ func (s *Service) getCollectMetricsFunc() func() interface{} {
 		for name, query := range queries {
 			result, warnings, err := prometheusApi.Query(context.Background(), query, time.Now())
 			if err != nil {
-				s.l.Warn("error getting metrics from prometheus", zap.Error(err))
+				s.l.Info("error getting metrics from prometheus", zap.Error(err))
 				return nil
 			}
 			if len(warnings) != 0 {
