@@ -103,6 +103,7 @@ type MessageType string
 const (
 	AddNodeToClusterT      MessageType = "addNodeToCluster"
 	RemoveNodeFromClusterT MessageType = "removeNodeFromCluster"
+	MetricsT               MessageType = "Metrics"
 )
 
 type Message struct {
