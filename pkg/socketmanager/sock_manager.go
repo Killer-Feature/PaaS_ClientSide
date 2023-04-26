@@ -83,7 +83,13 @@ func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duratio
 			return
 		}
 
-		msg := process()
+		var msg interface{}
+		for i := 0; i < 3; i++ {
+			msg = process()
+			if msg != nil {
+				break
+			}
+		}
 		if msg == nil {
 			return
 		}
