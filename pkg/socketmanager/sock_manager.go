@@ -70,40 +70,55 @@ func (sm *SocketManager[msgType]) run() {
 	}
 }
 
-func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duration, process func() interface{}) {
+func (sm *SocketManager[msgType]) SendResultToSocketByTicker(period time.Duration, process func() interface{}) func() {
 	ctx, cancel := context.WithCancel(context.Background())
 	sm.cMux.Lock()
 	sm.cancelFuncs = append(sm.cancelFuncs, cancel)
 	sm.cMux.Unlock()
 
-	ticker := time.NewTicker(period)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
+	doProcessAndSend := func() {
+		sm.sMux.Lock()
+		defer sm.sMux.Unlock()
+		if sm.s == nil {
 			return
-		case _ = <-ticker.C:
-			sm.sMux.Lock()
-			if sm.s == nil {
-				sm.sMux.Unlock()
-				return
-			}
-
-			msg := process()
-
-			err := sm.s.WriteJSON(msg)
-			sm.sMux.Unlock()
-
-			if err != nil {
-				if isCloseError(err) || errors.Is(err, syscall.EPIPE) {
-					sm.SetSocket(nil)
-					return
-				}
-				sm.l.Error("send to socket error", zap.String("err", err.Error()))
-			}
 		}
 
+		msg := process()
+		if msg == nil {
+			return
+		}
+
+		err := sm.s.WriteJSON(msg)
+
+		if err != nil {
+			if isCloseError(err) || errors.Is(err, syscall.EPIPE) {
+				sm.SetSocket(nil)
+				return
+			}
+			sm.l.Error("send to socket error", zap.String("err", err.Error()))
+		}
+	}
+
+	forceChan := make(chan struct{})
+
+	go func() {
+		ticker := time.NewTicker(period)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-forceChan:
+				doProcessAndSend()
+			case <-ticker.C:
+				doProcessAndSend()
+			}
+		}
+	}()
+
+	return func() {
+		forceChan <- struct{}{}
 	}
 }
 

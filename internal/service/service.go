@@ -3,8 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/api"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 	"net/netip"
 	"os"
+	"strconv"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
@@ -28,13 +32,12 @@ import (
 )
 
 type Service struct {
-	r          internal.Repository
-	l          *zap.Logger
-	tm         *taskmanager.Manager[netip.AddrPort]
-	sm         *socketmanager.SocketManager[internal.Message]
-	hi         *helm.HelmInstaller
-	progressCh chan internal.Message
-
+	r            internal.Repository
+	l            *zap.Logger
+	tm           *taskmanager.Manager[netip.AddrPort]
+	sm           *socketmanager.SocketManager[internal.Message]
+	hi           *helm.HelmInstaller
+	progressCh   chan internal.Message
 	k8sInstaller *k8s_installer.Installer
 }
 
@@ -349,9 +352,67 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 
 func (s *Service) GetProgress(ctx context.Context, socket *websocket.Conn) error {
 	s.sm.SetSocket(socket)
-
-	go s.sm.SendResultToSocketByTicker(time.Second, func() interface{} {
-		return interface{}(struct{ Message string }{"Message"})
-	})
+	forceSendMetrics := s.sm.SendResultToSocketByTicker(time.Second*8, s.getCollectMetricsFunc())
+	forceSendMetrics()
 	return nil
+}
+
+func (s *Service) getCollectMetricsFunc() func() interface{} {
+
+	queries := map[string]string{
+		"RamTotal":        `sum (machine_memory_bytes{kubernetes_io_hostname=~"^$"})`,
+		"RamUsage":        `sum (container_memory_working_set_bytes{id="/",kubernetes_io_hostname=~"^$"})`,
+		"CpuUsage":        `sum (rate (container_cpu_usage_seconds_total{id="/",kubernetes_io_hostname=~"^$"}[1m]))`,
+		"CpuTotal":        `sum (machine_cpu_cores{kubernetes_io_hostname=~"^$"})`,
+		"MemoryUsage":     `sum (container_fs_usage_bytes{device=~"^/dev/[sv]d[a-z][1-9]$",id="/",kubernetes_io_hostname=~"^$"})`,
+		"MemoryTotal":     `sum (container_fs_limit_bytes{device=~"^/dev/[sv]d[a-z][1-9]$",id="/",kubernetes_io_hostname=~"^$"})`,
+		"NetworkReceive":  `sum (rate (container_network_receive_bytes_total{kubernetes_io_hostname=~"^$"}[1m]))`,
+		"NetworkTransmit": `sum (rate (container_network_transmit_bytes_total{kubernetes_io_hostname=~"^$"}[1m]))`,
+	}
+
+	return func() interface{} {
+		client, err := api.NewClient(api.Config{
+			Address: "http://0.0.0.0:9090/",
+		})
+		if err != nil {
+			return nil
+		}
+
+		prometheusApi := v1.NewAPI(client)
+		metrics := make(map[string]float64, len(queries))
+
+		for name, query := range queries {
+			result, warnings, err := prometheusApi.Query(context.Background(), query, time.Now())
+			if err != nil {
+				s.l.Warn("error getting metrics from prometheus", zap.Error(err))
+				return nil
+			}
+			if len(warnings) != 0 {
+				s.l.Warn("warnings getting metrics from prometheus", zap.Strings("warnings", warnings))
+			}
+
+			if result != nil {
+				switch result.Type() {
+				case model.ValVector:
+					vectorRes := result.(model.Vector)
+					if len(vectorRes) != 1 {
+						s.l.Warn("error getting metrics from prometheus: vector has no 1 length", zap.String("metricName", name), zap.Int("len", len(vectorRes)))
+						return nil
+					}
+
+					metrics[name], err = strconv.ParseFloat(result.(model.Vector)[0].Value.String(), 64)
+					if err != nil {
+						s.l.Warn("error parsing value of metric from prometheus", zap.Error(err))
+						return nil
+					}
+				default:
+					s.l.Warn("error parsing value of metric from prometheus: unexpected result type", zap.Error(err))
+					return nil
+				}
+			}
+
+		}
+
+		return internal.Message{Type: internal.MetricsT, Payload: metrics}
+	}
 }
