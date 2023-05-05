@@ -35,24 +35,23 @@ type Service struct {
 	r            internal.Repository
 	l            *zap.Logger
 	tm           *taskmanager.Manager[netip.AddrPort]
-	sm           *socketmanager.SocketManager[internal.Message]
+	sm           *socketmanager.SocketManager
 	hi           *helm.HelmInstaller
-	progressCh   chan internal.Message
 	k8sInstaller *k8s_installer.Installer
+	initMsg      *initMessages
 }
 
 // NewService returns instance of Huginn service
 // Receives repository, logger and taskmanager structs as pointer
 func NewService(r internal.Repository, l *zap.Logger, tm *taskmanager.Manager[netip.AddrPort], k8sInstaller *k8s_installer.Installer, hi *helm.HelmInstaller) internal.Usecase {
-	progressCh := make(chan internal.Message)
 	return &Service{
 		r:            r,
 		l:            l,
 		tm:           tm,
-		sm:           socketmanager.NewSocketManager[internal.Message](progressCh, l),
+		sm:           socketmanager.NewSocketManager(l),
 		k8sInstaller: k8sInstaller,
 		hi:           hi,
-		progressCh:   progressCh,
+		initMsg:      newInitMessages(),
 	}
 }
 
@@ -96,7 +95,7 @@ func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, err
 	taskID, err := s.tm.AddTask(s.addNodeToCurrentClusterProgressTask(context.Background(), node), node.IP)
 
 	if err == nil {
-		s.progressCh <- internal.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
+		s.sm.Send(&socketmanager.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}})
 	}
 
 	return int(taskID), err
@@ -105,7 +104,12 @@ func (s *Service) AddNodeToCurrentCluster(ctx context.Context, id int) (int, err
 func (s *Service) addNodeToCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
 	return func(taskID taskmanager.ID) error {
 		sendProgress := func(percent int, status internal.TaskStatus, log string, err string) {
-			s.progressCh <- internal.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+			msg := socketmanager.Message{Type: internal.AddNodeToClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+			if status == internal.STATUS_ERROR || status == internal.STATUS_SUCCESS {
+				msg.MustSent = true
+			}
+			s.sm.Send(&msg)
+			s.initMsg.PushAddToCluster(node.ID, &msg)
 		}
 		sendProgress(1, internal.STATUS_START, "", "")
 		sshBuilder := ssh.NewSSHBuilder()
@@ -294,7 +298,7 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 
 	taskID, err := s.tm.AddTask(s.removeNodeFromCurrentClusterProgressTask(context.Background(), node), node.IP)
 	if err == nil {
-		s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}}
+		s.sm.Send(&socketmanager.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}})
 	}
 	return int(taskID), err
 }
@@ -302,7 +306,12 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
 	return func(taskID taskmanager.ID) error {
 		sendProgress := func(percent int, status internal.TaskStatus, log string, err string) {
-			s.progressCh <- internal.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+			msg := socketmanager.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+			if status == internal.STATUS_ERROR || status == internal.STATUS_SUCCESS {
+				msg.MustSent = true
+			}
+			s.sm.Send(&msg)
+			s.initMsg.PushRemoveFromCluster(node.ID, &msg)
 		}
 
 		sendProgress(1, internal.STATUS_START, "", "")
@@ -351,17 +360,15 @@ func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, 
 }
 
 func (s *Service) GetProgress(ctx context.Context, socket *websocket.Conn) error {
-	s.sm.AddSocket(socket)
-
-	if s.sm.CountSockets() == 1 {
-		s.sm.SendResultToSocketByTicker(time.Second*10, s.getCollectMetricsFunc())
+	isFirstConn := s.sm.HasWS()
+	s.sm.AddWS(socket, s.initMsg.GetInitMessages())
+	if !isFirstConn {
+		s.sm.RunByTicker(time.Second*10, s.getCollectMetricsFunc())
 	}
-	s.sm.ForceSendResultToSocket()
-
 	return nil
 }
 
-func (s *Service) getCollectMetricsFunc() func() interface{} {
+func (s *Service) getCollectMetricsFunc() func() *socketmanager.Message {
 
 	queries := map[string]string{
 		"RamTotal":        `sum (machine_memory_bytes{kubernetes_io_hostname=~"^$"})`,
@@ -374,7 +381,7 @@ func (s *Service) getCollectMetricsFunc() func() interface{} {
 		"NetworkTransmit": `sum (rate (container_network_transmit_bytes_total{kubernetes_io_hostname=~"^$"}[1m]))`,
 	}
 
-	return func() interface{} {
+	return func() *socketmanager.Message {
 		client, err := api.NewClient(api.Config{
 			Address: "http://0.0.0.0:9090/",
 			//Address: "http://5.188.142.208:9090/",
@@ -419,7 +426,8 @@ func (s *Service) getCollectMetricsFunc() func() interface{} {
 			}
 
 		}
-
-		return internal.Message{Type: internal.MetricsT, Payload: metrics}
+		metricsMsg := socketmanager.Message{Type: internal.MetricsT, Payload: metrics}
+		s.initMsg.PushMetrics(&metricsMsg)
+		return &metricsMsg
 	}
 }
