@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"github.com/Killer-Feature/PaaS_ClientSide/pkg/socketmanager"
 	"github.com/gorilla/websocket"
 	"net/netip"
 
@@ -98,15 +99,8 @@ type RemoveNodeFromClusterMsg struct {
 	NodeID  int        `json:"nodeID"`
 }
 
-type MessageType string
-
 const (
-	AddNodeToClusterT      MessageType = "addNodeToCluster"
-	RemoveNodeFromClusterT MessageType = "removeNodeFromCluster"
-	MetricsT               MessageType = "Metrics"
+	AddNodeToClusterT      socketmanager.MessageType = "addNodeToCluster"
+	RemoveNodeFromClusterT socketmanager.MessageType = "removeNodeFromCluster"
+	MetricsT               socketmanager.MessageType = "Metrics"
 )
-
-type Message struct {
-	Payload interface{} `json:"payload"`
-	Type    MessageType `json:"type"`
-}

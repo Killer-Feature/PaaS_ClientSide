@@ -9,11 +9,16 @@ require (
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/common v0.37.0
 	go.uber.org/zap v1.24.0
+	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
 	golang.org/x/sync v0.1.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.11.2
+	k8s.io/apimachinery v0.26.0
 	k8s.io/cli-runtime v0.26.0
+	k8s.io/client-go v0.26.0
 )
 
 require (
@@ -89,9 +94,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc2 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rubenv/sql-migrate v1.3.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -116,9 +119,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/api v0.26.0 // indirect
 	k8s.io/apiextensions-apiserver v0.26.0 // indirect
-	k8s.io/apimachinery v0.26.0 // indirect
 	k8s.io/apiserver v0.26.0 // indirect
-	k8s.io/client-go v0.26.0 // indirect
 	k8s.io/component-base v0.26.0 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
