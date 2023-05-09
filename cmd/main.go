@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"net/netip"
@@ -24,7 +26,24 @@ import (
 	"github.com/Killer-Feature/PaaS_ClientSide/internal/service"
 )
 
+const (
+	LOGIN_FLAG = "user"
+	PASS_FLAG  = "password"
+)
+
 func main() {
+	admin := flag.String(LOGIN_FLAG, "", "login for ssh")
+	password := flag.String(PASS_FLAG, "", "password for ssh")
+
+	flag.Parse()
+
+	if *admin == "" || *password == "" {
+		log.Fatal("Admin credentials required. Pass it with --user & --password flags")
+		fmt.Println(*admin + *password)
+	}
+
+	// save to sqlite
+
 	config := zap.NewDevelopmentConfig()
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	prLogger, err := zaplogger.NewZapLogger(&config)
@@ -49,6 +68,11 @@ func main() {
 	if err != nil {
 		logger.Fatal("database creating error", zap.Error(err))
 	}
+	err = r.AddAdmin(ctx, *admin, *password)
+	if err != nil {
+		logger.Fatal("adding admin error", zap.Error(err))
+	}
+
 	tm := taskmanager.NewTaskManager[netip.AddrPort](ctx, servLogger)
 	hi, err := helm.NewHelmInstaller("default", "https://charts.bitnami.com/bitnami", "bitnami", logger)
 	if err != nil {
@@ -66,14 +90,15 @@ func main() {
 
 	server.Use(middleware.Recover())
 
-	server.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{"*"},
-		AllowCredentials: true,
-		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderXCSRFToken},
-		AllowMethods:     []string{echo.GET, echo.POST, echo.OPTIONS, echo.PUT},
-		ExposeHeaders:    []string{echo.HeaderXCSRFToken},
-		MaxAge:           86400,
-	}))
+	//server.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+	//	// TODO: try remove
+	//	AllowOrigins:     []string{"*"},
+	//	AllowCredentials: true,
+	//	AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderXCSRFToken},
+	//	AllowMethods:     []string{echo.GET, echo.POST, echo.OPTIONS, echo.PUT},
+	//	ExposeHeaders:    []string{echo.HeaderXCSRFToken},
+	//	MaxAge:           86400,
+	//}))
 
 	g.Go(func() error {
 		return server.Start(":8090")

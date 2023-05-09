@@ -81,7 +81,7 @@ func (i *initMessages) GetInitMessages() []*socketmanager.Message {
 	getValid(i.addToClusterProgress)
 	getValid(i.removeFromClusterProgress)
 
-	if i.metrics.msg != nil && time.Now().Before(i.metrics.expired) {
+	if i.metrics.msg != nil {
 		msgs = append(msgs, i.metrics.msg)
 	}
 	return msgs

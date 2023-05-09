@@ -1,21 +1,24 @@
 package handlers
 
 import (
+	"context"
 	"embed"
-	"io/fs"
-	"log"
-	"net/http"
-	"net/netip"
-
 	"github.com/Killer-Feature/PaaS_ClientSide/internal"
 	"github.com/gorilla/websocket"
 	echo "github.com/labstack/echo/v4"
 	"go.uber.org/zap"
+	"io/fs"
+	"log"
+	"net"
+	"net/http"
+	"net/netip"
+	"time"
 )
 
 const (
-	READ_BUFSIZE  = 1024
-	WRITE_BUFSIZE = 1024
+	READ_BUFSIZE        = 1024
+	WRITE_BUFSIZE       = 1024
+	SESSION_COOKIE_NAME = "session"
 )
 
 var upgrader = websocket.Upgrader{
@@ -47,21 +50,26 @@ var htmlPage string
 func (h *Handler) Register(s *echo.Echo) {
 	// Register http handlers
 	s.GET("/hello", h.GetHello)
-	s.GET("/api/getClusterNodes", h.GetClusterNodes)
 
-	s.POST("/api/addNode", h.AddNode)
-	s.POST("/api/addNodeToCluster", h.AddNodeToCluster)
+	s.POST("/api/login", h.Login)
 
-	s.POST("/api/removeNode", h.RemoveNode)
-	s.POST("/api/removeNodeFromCluster", h.RemoveNodeFromCluster)
+	s.GET("/api/logout", h.Logout, h.AuthMW)
 
-	s.POST("/api/addResource", h.AddResource)
-	s.POST("/api/removeResource", h.RemoveResource)
-	s.GET("/api/getResources", h.GetResources)
+	s.GET("/api/getClusterNodes", h.GetClusterNodes, h.AuthMW)
 
-	s.GET("/api/getAdminConfig", h.GetAdminConfig)
+	s.POST("/api/addNode", h.AddNode, h.AuthMW)
+	s.POST("/api/addNodeToCluster", h.AddNodeToCluster, h.AuthMW)
 
-	s.GET("/api/getServices", h.GetServices)
+	s.POST("/api/removeNode", h.RemoveNode, h.AuthMW)
+	s.POST("/api/removeNodeFromCluster", h.RemoveNodeFromCluster, h.AuthMW)
+
+	s.POST("/api/addResource", h.AddResource, h.AuthMW)
+	s.POST("/api/removeResource", h.RemoveResource, h.AuthMW)
+	s.GET("/api/getResources", h.GetResources, h.AuthMW)
+
+	s.GET("/api/getAdminConfig", h.GetAdminConfig, h.AuthMW)
+
+	s.GET("/api/getServices", h.GetServices, h.AuthMW)
 
 	s.GET("/api/getProgress", h.GetProgress)
 
@@ -270,4 +278,59 @@ func (h *Handler) GetServices(ctx echo.Context) error {
 		return ctx.NoContent(http.StatusOK)
 	}
 	return ctx.JSON(http.StatusOK, resources)
+}
+
+func (h *Handler) Login(ctx echo.Context) error {
+	if IsAdmin(ctx) {
+		return ctx.HTML(http.StatusConflict, "already authorized")
+	}
+
+	var loginData internal.LoginData
+	if err := ctx.Bind(&loginData); err != nil {
+		h.logger.Error("error occurred during parsing LoginData", zap.Error(err))
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+
+	sessionKey, err := h.u.Login(context.Background(), loginData)
+	if err != nil {
+		h.logger.Error("error during login request", zap.Error(err))
+		return ctx.HTML(http.StatusInternalServerError, err.Error())
+	}
+
+	host, _, _ := net.SplitHostPort(ctx.Request().Host)
+	ctx.SetCookie(&http.Cookie{
+		Expires:  time.Now().Add(30 * 24 * time.Hour),
+		Secure:   false,
+		HttpOnly: true,
+		Name:     SESSION_COOKIE_NAME,
+		Value:    sessionKey,
+		Domain:   host,
+		Path:     "/",
+	})
+
+	return ctx.NoContent(http.StatusOK)
+}
+
+func (h *Handler) Logout(ctx echo.Context) error {
+	sessionCookie, err := ctx.Request().Cookie(SESSION_COOKIE_NAME)
+
+	if err != nil {
+		return ctx.HTML(http.StatusUnauthorized, "auth required")
+	}
+
+	err = h.u.Logout(ctx.Request().Context(), sessionCookie.Value)
+
+	if err != nil {
+		return ctx.HTML(http.StatusInternalServerError, err.Error())
+	}
+
+	host, _, _ := net.SplitHostPort(ctx.Request().Host)
+	ctx.SetCookie(&http.Cookie{
+		Expires: time.Now().Add(-time.Hour),
+		Name:    SESSION_COOKIE_NAME,
+		Domain:  host,
+		Path:    "/",
+	})
+
+	return ctx.NoContent(http.StatusOK)
 }
