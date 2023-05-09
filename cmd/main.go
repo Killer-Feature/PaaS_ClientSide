@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"net/netip"
@@ -39,7 +38,6 @@ func main() {
 
 	if *admin == "" || *password == "" {
 		log.Fatal("Admin credentials required. Pass it with --user & --password flags")
-		fmt.Println(*admin + *password)
 	}
 
 	// save to sqlite
