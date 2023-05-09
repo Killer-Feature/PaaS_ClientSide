@@ -297,6 +297,10 @@ func (h *Handler) Login(ctx echo.Context) error {
 		return ctx.HTML(http.StatusInternalServerError, err.Error())
 	}
 
+	if sessionKey == "" {
+		return ctx.HTML(http.StatusForbidden, "invalid login or password")
+	}
+
 	host, _, _ := net.SplitHostPort(ctx.Request().Host)
 	ctx.SetCookie(&http.Cookie{
 		Expires:  time.Now().Add(30 * 24 * time.Hour),

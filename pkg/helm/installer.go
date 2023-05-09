@@ -272,7 +272,6 @@ func (hi *HelmInstaller) InstallChart(name, repo, chart string, args map[string]
 	if err != nil {
 		return err
 	}
-	//fmt.Println(release.Manifest)
 	return nil
 }
 
@@ -297,7 +296,6 @@ func (hi *HelmInstaller) UninstallChart(name string) error {
 	client := action.NewUninstall(actionConfig)
 
 	_, err := client.Run(name)
-	//fmt.Println(resp)
 	return err
 }
 
