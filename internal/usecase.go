@@ -25,6 +25,9 @@ type Usecase interface {
 	GetServices(ctx context.Context) ([]Service, error)
 	RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int, error)
 	GetProgress(ctx context.Context, socket *websocket.Conn) error
+	IsAdmin(ctx context.Context, session string) (bool, error)
+	Login(ctx context.Context, data LoginData) (string, error)
+	Logout(ctx context.Context, session string) error
 }
 
 var (
@@ -104,3 +107,8 @@ const (
 	RemoveNodeFromClusterT socketmanager.MessageType = "removeNodeFromCluster"
 	MetricsT               socketmanager.MessageType = "Metrics"
 )
+
+type LoginData struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+}

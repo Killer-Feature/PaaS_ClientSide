@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
+	"math/big"
 	"net/netip"
 	"os"
 	"strconv"
@@ -29,6 +31,10 @@ import (
 	"github.com/Killer-Feature/PaaS_ServerSide/pkg/taskmanager"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	SESSION_KEY_LEN = 32
 )
 
 type Service struct {
@@ -384,9 +390,7 @@ func (s *Service) getCollectMetricsFunc() func() *socketmanager.Message {
 	return func() *socketmanager.Message {
 		client, err := api.NewClient(api.Config{
 			Address: "http://0.0.0.0:9090/",
-			//Address: "http://5.188.142.208:9090/",
 			//Address: "http://localhost:9090/",
-			//Address: "http://89.208.220.55:9090/",
 		})
 		if err != nil {
 			return nil
@@ -430,4 +434,39 @@ func (s *Service) getCollectMetricsFunc() func() *socketmanager.Message {
 		s.initMsg.PushMetrics(&metricsMsg)
 		return &metricsMsg
 	}
+}
+
+func (s *Service) IsAdmin(ctx context.Context, session string) (bool, error) {
+	return s.r.ExistSession(ctx, session)
+}
+
+func (s *Service) Login(ctx context.Context, data internal.LoginData) (string, error) {
+	ok, err := s.r.CheckLoginData(ctx, data.User, data.Password)
+
+	if err != nil || !ok {
+		return "", err
+	}
+
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	maxIndex := big.NewInt(int64(len(letterBytes)))
+
+	sessionKey := make([]byte, SESSION_KEY_LEN)
+	for i := range sessionKey {
+		index, err := rand.Int(rand.Reader, maxIndex)
+		if err != nil {
+			return "", err
+		}
+		sessionKey[i] = letterBytes[index.Int64()]
+	}
+
+	err = s.r.AddSession(ctx, string(sessionKey))
+	if err != nil {
+		return "", err
+	}
+	return string(sessionKey), err
+}
+
+func (s *Service) Logout(ctx context.Context, session string) error {
+	return s.r.RemoveSession(ctx, session)
 }

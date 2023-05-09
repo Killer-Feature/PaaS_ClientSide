@@ -26,6 +26,12 @@ type Repository interface {
 	CheckClusterTokenIPAndHash(ctx context.Context, clusterID int) (bool, error)
 	GetClusterTokenIPAndHash(ctx context.Context, clusterID int) (token, masterIP, hash string, err error)
 	DeleteClusterTokenIPAndHash(ctx context.Context, clusterID int) (err error)
+
+	AddAdmin(ctx context.Context, user, password string) error
+	ExistSession(ctx context.Context, session string) (bool, error)
+	AddSession(ctx context.Context, session string) error
+	CheckLoginData(ctc context.Context, user, password string) (bool, error)
+	RemoveSession(ctx context.Context, session string) error
 }
 
 type FullNode struct {
@@ -36,4 +42,8 @@ type FullNode struct {
 	Password  string
 	ClusterID int
 	IsMaster  bool
+}
+
+type Session struct {
+	Session string
 }

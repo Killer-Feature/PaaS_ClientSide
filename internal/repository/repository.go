@@ -92,6 +92,35 @@ func Create(l *zap.Logger) (internal.Repository, error) {
 		return nil, err
 	}
 
+	createAdminTableSQL := `CREATE TABLE IF NOT EXISTS admin (
+    	"user" TEXT,
+		"password" TEXT
+	  );`
+
+	statement, err = db.Prepare(createAdminTableSQL)
+	if err != nil {
+		l.Error("error occurred during preparing table creating statement", zap.Error(err))
+	}
+	_, err = statement.Exec()
+	if err != nil {
+		l.Error("error occurred during execution table creating statement", zap.Error(err))
+		return nil, err
+	}
+
+	createSessionsTableSQL := `CREATE TABLE IF NOT EXISTS sessions (
+		"session" TEXT UNIQUE
+	  );`
+
+	statement, err = db.Prepare(createSessionsTableSQL)
+	if err != nil {
+		l.Error("error occurred during preparing table creating statement", zap.Error(err))
+	}
+	_, err = statement.Exec()
+	if err != nil {
+		l.Error("error occurred during execution table creating statement", zap.Error(err))
+		return nil, err
+	}
+
 	l.Debug("repository created")
 
 	r := &Repository{
@@ -238,6 +267,20 @@ func (r *Repository) AddCluster(ctx context.Context, clusterName string) (int, e
 	return id, nil
 }
 
+func (r *Repository) AddAdmin(ctx context.Context, user, password string) error {
+	_, err := r.db.Exec("DELETE FROM admin")
+	if err != nil {
+		return err
+	}
+	sqlScript := "INSERT INTO admin(user,password) VALUES ($1,$2);"
+	_, err = r.db.ExecContext(ctx, sqlScript, user, password)
+	if err != nil {
+		r.l.Error("error during adding user to database", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
 func (r *Repository) GetClusterID(ctx context.Context, clusterName string) (int, error) {
 	sqlScript := "SELECT id FROM clusters WHERE name = $1;"
 	var id int
@@ -378,6 +421,48 @@ func (r *Repository) AddResource(ctx context.Context, rType, name string) error 
 	_, err := r.db.ExecContext(ctx, sqlScript, rType, name)
 	if err != nil {
 		r.l.Error("error during adding cluster to database", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *Repository) ExistSession(ctx context.Context, session string) (bool, error) {
+	sqlScript := "SELECT EXISTS(SELECT 1 FROM sessions WHERE session = $1)"
+	exist := false
+	err := r.db.QueryRowContext(ctx, sqlScript, session).Scan(&exist)
+	if err != nil {
+		r.l.Error("error during getting session from database", zap.Error(err))
+		return false, err
+	}
+	return exist, nil
+}
+
+func (r *Repository) CheckLoginData(ctx context.Context, user, password string) (bool, error) {
+	sqlScript := "SELECT EXISTS(SELECT 1 FROM admin WHERE user = $1 AND password = $2)"
+	exist := false
+	err := r.db.QueryRowContext(ctx, sqlScript, user, password).Scan(&exist)
+	if err != nil {
+		r.l.Error("error during getting admin from database", zap.Error(err))
+		return false, err
+	}
+	return exist, nil
+}
+
+func (r *Repository) AddSession(ctx context.Context, session string) error {
+	sqlScript := "INSERT INTO sessions(session) VALUES ($1);"
+	_, err := r.db.ExecContext(ctx, sqlScript, session)
+	if err != nil {
+		r.l.Error("error during adding session to database", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (r *Repository) RemoveSession(ctx context.Context, session string) error {
+	sqlScript := "DELETE FROM sessions WHERE session=$1;"
+	_, err := r.db.ExecContext(ctx, sqlScript, session)
+	if err != nil {
+		r.l.Error("error during removing session to database", zap.Error(err))
 		return err
 	}
 	return nil
