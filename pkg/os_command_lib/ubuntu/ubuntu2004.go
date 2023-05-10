@@ -15,7 +15,7 @@ func (u *Ubuntu2004CommandLib) SudoUpdate() cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "sudo apt update",
 		Parser:    nil,
-		Condition: cl.Required,
+		Condition: cl.Sufficient,
 	}
 }
 
