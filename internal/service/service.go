@@ -304,7 +304,7 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 
 	taskID, err := s.tm.AddTask(s.removeNodeFromCurrentClusterProgressTask(context.Background(), node), node.IP)
 	if err == nil {
-		s.sm.Send(&socketmanager.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}})
+		s.sm.Send(&socketmanager.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.RemoveNodeFromClusterMsg{NodeID: node.ID, Status: internal.STATUS_IN_QUEUE, Percent: 0}})
 	}
 	return int(taskID), err
 }
@@ -312,7 +312,7 @@ func (s *Service) RemoveNodeFromCurrentCluster(ctx context.Context, id int) (int
 func (s *Service) removeNodeFromCurrentClusterProgressTask(ctx context.Context, node internal.FullNode) func(taskId taskmanager.ID) error {
 	return func(taskID taskmanager.ID) error {
 		sendProgress := func(percent int, status internal.TaskStatus, log string, err string) {
-			msg := socketmanager.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.AddNodeToClusterProgressMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
+			msg := socketmanager.Message{Type: internal.RemoveNodeFromClusterT, Payload: internal.RemoveNodeFromClusterMsg{NodeID: node.ID, Status: status, Percent: percent, Log: log, Error: err}}
 			if status == internal.STATUS_ERROR || status == internal.STATUS_SUCCESS {
 				msg.MustSent = true
 			}
