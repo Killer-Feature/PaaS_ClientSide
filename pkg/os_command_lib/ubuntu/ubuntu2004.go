@@ -15,7 +15,7 @@ func (u *Ubuntu2004CommandLib) SudoUpdate() cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "sudo apt update",
 		Parser:    nil,
-		Condition: cl.Sufficient,
+		Condition: cl.Anyway,
 	}
 }
 
@@ -23,7 +23,7 @@ func (u *Ubuntu2004CommandLib) SudoFullUpgrade() cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "sudo apt -y full-upgrade",
 		Parser:    nil,
-		Condition: cl.Required,
+		Condition: cl.Anyway,
 	}
 }
 
@@ -31,7 +31,7 @@ func (u *Ubuntu2004CommandLib) AddCRIORepos() cl.CommandAndParser {
 	return cl.CommandAndParser{
 		Command:   "echo \"deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/ /\"|sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list\necho \"deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/1.26/xUbuntu_20.04/ /\"|sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:1.26.list",
 		Parser:    nil,
-		Condition: cl.Required,
+		Condition: cl.Anyway,
 	}
 }
 
