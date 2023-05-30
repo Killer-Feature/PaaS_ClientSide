@@ -67,6 +67,7 @@ func (installer *Installer) installKubeadm() []cl.CommandAndParser {
 		commandLib.InstallUtils(),
 		commandLib.DownloadGoogleCloudSigningKey(),
 		commandLib.AddK8SRepo(),
+		commandLib.SudoUpdate(),
 		commandLib.InstallKubeadm(),
 		commandLib.SetModprobe(),
 		commandLib.SetIpForward(),

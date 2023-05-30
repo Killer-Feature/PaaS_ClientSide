@@ -93,7 +93,7 @@ func (u *Ubuntu2004CommandLib) AddK8SRepo() cl.CommandAndParser {
 
 func (u *Ubuntu2004CommandLib) InstallKubeadm() cl.CommandAndParser {
 	return cl.CommandAndParser{
-		Command:   "sudo apt-get update\nsudo apt-get install -y kubelet kubeadm kubectl\nsudo apt-mark hold kubelet kubeadm kubectl",
+		Command:   "sudo apt-get install -y kubelet kubeadm kubectl\nsudo apt-mark hold kubelet kubeadm kubectl",
 		Parser:    nil,
 		Condition: cl.Required,
 	}
